@@ -210,3 +210,4 @@ __marimo__/
 # specific files 
 *.e*
 *.o*
+plots/
