@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=iwp_dist# Specify job name
-#SBATCH --output=iwp_dist.o%j # name for standard output log file
-#SBATCH --error=iwp_dist.e%j # name for standard error output log
+#SBATCH --job-name=download_dardar# Specify job name
+#SBATCH --output=download_dardar.o%j # name for standard output log file
+#SBATCH --error=download_dardar.e%j # name for standard error output log
 #SBATCH --partition=compute
 #SBATCH --account=bm1183
 #SBATCH --nodes=1
@@ -32,6 +32,6 @@ module load lftp
 # Run lftp to mirror the remote folder
 lftp -u "$SFTP_USER,$SFTP_PASS" sftp://$SFTP_HOST <<EOF
 set ssl:verify-certificate no
-mirror --verbose --continue --parallel=4 --dereference "$REMOTE_DIR" "$LOCAL_DIR"
+mirror --verbose --continue --parallel=16 --dereference "$REMOTE_DIR" "$LOCAL_DIR"
 bye
 EOF
