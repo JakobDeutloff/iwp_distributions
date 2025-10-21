@@ -31,17 +31,7 @@ hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
 hists_spare = xr.open_dataset('/work/bm1183/m301049/spareice/hists_metop.nc')
 
 # %% open dardar
-dardar_raw = xr.open_dataset("/work/bm1183/m301049/dardar/dardar_iwp_2008.nc")
-mask = (dardar_raw["latitude"] > -30) & (dardar_raw["latitude"] < 30)
-dardar_raw = dardar_raw.where(mask)
-
-# %% calculate dardar hist
-dardar, edges = np.histogram(
-    dardar_raw["iwp"] * 1e-3, bins=bins, density=False
-)
-dardar = (
-    dardar / dardar_raw["iwp"].count().values
-)
+dardar = xr.open_dataset('/work/bm1183/m301049/dardarv3.10/hist_dardar.nc')
 
 # %%
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -50,11 +40,12 @@ year = '2008'
 ccic = hists_ccic.sel(time=year)
 spare = hists_spare.sel(time=year)
 two_c = hists_2c.sel(time=year)
+dardar = dardar.sel(time=year)
 
 ax.stairs(ccic['hist'].sum('time') / ccic['size'].sum('time'), bins, label='CCIC', color='blue')
 ax.stairs(spare['hist'].sum('time') / spare['sizes'].sum('time'), bins, label='SPARE-ICE', color='red')
 ax.stairs(two_c['hist'].sum('time') / two_c['size'].sum('time'), bins, label='2C-ICE', linewidth=3, color='grey')
-ax.stairs(dardar, edges, label='DARDAR v2.1', linewidth=3, color='brown')
+ax.stairs(dardar['hist'].sum('time') / dardar['size'].sum('time'), bins, label='DARDAR v2.1', linewidth=3, color='brown')
 
 ax.set_xlim(1e-3, 1e2)
 ax.spines[['top', 'right']].set_visible(False)

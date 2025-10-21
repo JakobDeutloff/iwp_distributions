@@ -13,4 +13,4 @@ set -o errexit -o nounset -o pipefail -o xtrace
 export PYTHONPATH="/home/m/m301049/iwp_distributions/"
 
 # calc iwp
-/home/m/m301049/.conda/envs/main/bin/python /home/m/m301049/iwp_distributions/scripts/diagnose/dardar_iwp.py $1 
+/home/m/m301049/.conda/envs/main/bin/python /home/m/m301049/iwp_distributions/scripts/diagnose/dardar_iwp.py $1 $2
