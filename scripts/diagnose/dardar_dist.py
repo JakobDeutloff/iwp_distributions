@@ -51,8 +51,15 @@ with ProcessPoolExecutor(max_workers=32) as executor:
         hists_list.append(hists)
 
 
-
 # %%
 histogram = xr.concat(hists_list, dim='time')
-# %%
+
+# %% sum up duplicated days
+histogram = histogram.groupby('time').sum()
+
+#%% transpose to have bin_center as first dimension
+histogram['hist'] = histogram['hist'].transpose('bin_center', 'time')
+
+# %% save
 histogram.to_netcdf('/work/bm1183/m301049/dardarv3.10/hist_dardar.nc')
+# %%
