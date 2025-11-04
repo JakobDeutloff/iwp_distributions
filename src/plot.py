@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 
+
 def plot_regression(temp, hists, slopes, error, title):
     fig, axes = plt.subplots(
         2, 3, figsize=(8, 8), sharex="col", width_ratios=[6, 24, 1]
@@ -82,3 +83,42 @@ def plot_hists(hists, temp, bins):
     sm.set_array([])
     fig.colorbar(sm, ax=axes, label="Temperature / K")
     return fig
+
+
+def definitions():
+
+    colors = {
+        "jed0011": "#462d7b",
+        "jed0022": "#c1df24",
+        "jed0033": "#1f948a",
+        "rcemip": "#ff7f0e",
+        'dardar': 'brown',
+        '2c': 'k', 
+        'ccic': 'purple',
+        'spare': 'darkgreen'
+    }
+
+    labels = {
+        'jed0011': 'ICON Control', 
+        'jed0022': 'ICON +4 K',
+        'jed0033': 'ICON +2 K',
+        'rcemip': 'RCEMIP',
+        'dardar': 'DARDAR',
+        '2c': '2C-ICE',
+        'ccic': 'CCIC',
+        'spare': 'SPARE-ICE',
+    }
+
+    linestyles = {
+        "jed0011": "--",
+        "jed0022": "--",
+        "jed0033": "--",
+        "rcemip": "--",
+        'dardar': '-',
+        '2c': '-',
+        'ccic': '-',
+        'spare': '-',
+    }
+
+
+    return colors, labels, linestyles

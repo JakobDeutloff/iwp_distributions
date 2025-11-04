@@ -8,9 +8,10 @@ from dask.diagnostics import ProgressBar
 import pandas as pd
 from scipy.signal import detrend
 from scipy.stats import linregress
-from src.plot import plot_regression, plot_hists
-from src.helper_functions import nan_detrend
+from src.plot import plot_regression, plot_hists, definitions
+from src.helper_functions import nan_detrend, interpolate_bins
 import pickle
+
 
 # %% initialize containers
 hists_monthly = {}
@@ -18,7 +19,8 @@ hists_smooth = {}
 slopes_monthly = {}
 error_montly = {}
 bins = bins = np.logspace(-3, 2, 254)[::4]
-datasets = ["ccic", "2c", "dardar"]
+datasets = ["ccic", "2c", "dardar", "spare"]
+colors, line_labels, linestyles = definitions()
 
 # %% open CCIC
 path = "/work/bm1183/m301049/ccic/"
@@ -43,6 +45,9 @@ hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
 # %% open dardar
 hists_dardar = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
 
+# %% open spareice
+hists_spare = xr.open_dataset("/work/bm1183/m301049/spareice/hists_metop.nc")
+
 # %% coarsen histograms and normalise by size
 hists_ccic_coarse = hists_ccic.coarsen(bin_center=4, boundary="trim").sum()
 
@@ -65,6 +70,18 @@ hists_monthly["dardar"] = (
 hists_monthly["dardar"] = hists_monthly["dardar"].where(
     hists_dardar["size"].resample(time="1ME").sum() > 2.1e6
 )
+
+# spareice
+hists_monthly["spare"] = hists_spare["hist"] / hists_spare["size"]
+# effectively masks year 2020
+x = (
+    np.abs(hists_monthly["spare"].mean("time") - hists_monthly["spare"]).sum(
+        "bin_center"
+    )
+    < 0.04
+)
+hists_monthly["spare"] = hists_monthly["spare"].where(x).transpose("bin_center", "time")
+
 
 # %% fix time coordinates
 for key in datasets:
@@ -97,8 +114,8 @@ t_annual = t_month.resample(time="1YE").mean("time")
 
 # %%
 plot_hists(
-    hists_monthly["dardar"].sel(time=slice("2011", "2017")),
-    t_month.sel(time=slice("2011", "2017")),
+    hists_monthly["spare"].sel(time=slice("2007-05", "2025-07")),
+    t_month.sel(time=slice("2007-05", "2025-07")),
     bins,
 )
 
@@ -109,21 +126,17 @@ t_detrend = xr.DataArray(detrend(t_month), coords=t_month.coords, dims=t_month.d
 t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby("time.month").mean(
     "time"
 )
-t_smooth = t_deseason.rolling(time=3, center=True).mean()
+t_smooth = t_deseason.rolling(time=1, center=True).mean()
 t_smooth["time"] = pd.to_datetime(t_smooth["time"].dt.strftime("%Y-%m"))
 
 # histograms ccic
-hists_detrend = xr.DataArray(
-    detrend(hists_monthly["ccic"], axis=1),
-    coords=hists_monthly["ccic"].coords,
-    dims=hists_monthly["ccic"].dims,
-)
+hists_detrend = nan_detrend(hists_monthly["ccic"])
 hists_deseason = hists_detrend.groupby("time.month") - hists_detrend.groupby(
     "time.month"
 ).mean("time")
 hists_deseason["time"] = pd.to_datetime(hists_deseason["time"].dt.strftime("%Y-%m"))
 hists_smooth_ccic = (
-    hists_deseason.rolling(time=3, center=True).mean().isel(time=slice(1, -1))
+    hists_deseason.rolling(time=1, center=True).mean().isel(time=slice(1, -1))
 )
 hists_smooth_ccic["time"] = pd.to_datetime(
     hists_smooth_ccic["time"].dt.strftime("%Y-%m")
@@ -137,7 +150,7 @@ hists_2c_deseason = hists_2c_detrend.groupby("time.month") - hists_2c_detrend.gr
     "time.month"
 ).mean("time")
 hists_smooth_2c = (
-    hists_2c_deseason.rolling(time=3, center=True, min_periods=1)
+    hists_2c_deseason.rolling(time=1, center=True, min_periods=1)
     .mean()
     .where(hists_2c_detrend.notnull())
 )
@@ -150,11 +163,23 @@ hists_dardar_deseason = hists_dardar_detrend.groupby(
     "time.month"
 ) - hists_dardar_detrend.groupby("time.month").mean("time")
 hists_smooth_dardar = (
-    hists_dardar_deseason.rolling(time=3, center=True, min_periods=1)
+    hists_dardar_deseason.rolling(time=1, center=True, min_periods=1)
     .mean()
     .where(hists_dardar_detrend.notnull())
 )
 hists_smooth["dardar"] = hists_smooth_dardar
+
+# histograms spareice
+hists_spare_detrend = nan_detrend(hists_monthly["spare"])
+hists_spare_deseason = hists_spare_detrend.groupby(
+    "time.month"
+) - hists_spare_detrend.groupby("time.month").mean("time")
+hists_smooth_spare = (
+    hists_spare_deseason.rolling(time=1, center=True, min_periods=1)
+    .mean()
+    .where(hists_spare_detrend.notnull())
+)
+hists_smooth["spare"] = hists_smooth_spare
 
 # %%regression
 slopes_ccic = []
@@ -211,6 +236,31 @@ error_montly["dardar"] = xr.DataArray(
     dims=["bin_center"],
 )
 
+slopes_spare = []
+err_spare = []
+hists_dummy = (
+    hists_smooth["spare"]
+    .where(hists_spare_deseason.notnull(), drop=True)
+    .sel(time=slice(None, "2025-06"))
+)
+temp_vals_spare = t_smooth.sel(time=hists_dummy.time).values
+for i in range(hists_dummy.bin_center.size):
+    hist_vals = hists_dummy.isel(bin_center=i).values
+    res = linregress(temp_vals_spare, hist_vals)
+    slopes_spare.append(res.slope)
+    err_spare.append(res.stderr)
+
+slopes_monthly["spare"] = xr.DataArray(
+    slopes_spare,
+    coords={"bin_center": hists_smooth["spare"].bin_center},
+    dims=["bin_center"],
+)
+error_montly["spare"] = xr.DataArray(
+    err_spare,
+    coords={"bin_center": hists_smooth["spare"].bin_center},
+    dims=["bin_center"],
+)
+
 # %%
 fig, axes = plot_regression(
     t_smooth,
@@ -240,6 +290,16 @@ fig, axes = plot_regression(
 )
 fig.savefig("plots/dardar_monthly.png", dpi=300, bbox_inches="tight")
 
+# %%
+fig, axes = plot_regression(
+    t_smooth.sel(time=slice(None, "2025-07")),
+    hists_smooth["spare"].sel(time=slice(None, "2025-07")),
+    slopes_monthly["spare"],
+    error_montly["spare"],
+    "SPARE-ICE Monthly",
+)
+fig.savefig("plots/spare_monthly.png", dpi=300, bbox_inches="tight")
+
 # %% load cre data and hists from icon
 cre = xr.open_dataset(
     f"/work/bm1183/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
@@ -267,17 +327,18 @@ for run in ["jed0011", "jed0022", "jed0033"]:
 # %% interpolate
 iwp_hists_int = {}
 for run in ["jed0011", "jed0022", "jed0033"]:
-    cdf = iwp_hists[run].cumsum("iwp")
-    cdf_int = cdf.interp(iwp=bins).rename({"iwp": "bin_center"})
-    pdf_int = cdf_int.diff("bin_center")
-    iwp_hists_int[run] = pdf_int
+    iwp_hists_int[run] = interpolate_bins(iwp_hists[run], bins, "iwp")
 
     # check cdf
     print(
         f"{run} sum original: {iwp_hists[run].sel(iwp=slice(iwp_hists_int[run]['bin_center'].min(), None)).sum().item():.3f}, sum interp: {iwp_hists_int[run].sum().item():.3f}"
     )
 
-cre = cre.interp(iwp=hists_monthly['ccic'].bin_center)
+cre["iwp"] = np.log10(cre["iwp"])
+cre = cre.interp(
+    iwp=np.log10(hists_monthly["ccic"].bin_center), method="linear"
+).drop_vars("iwp")
+cre['bin_center'] = 10 ** cre['bin_center']
 iwp_change_icon = {}
 temp_deltas = {"jed0022": 4, "jed0033": 2}
 for run in ["jed0022", "jed0033"]:
@@ -289,50 +350,105 @@ for run in ["jed0022", "jed0033"]:
 ds = xr.open_dataset(
     "/work/bm1183/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
 )
-ds['fwp'] = ds['fwp'] * 1e-3
-# interpolate histogram 
-rcemip_cdf = ds.f.mean('model').cumsum('fwp').interp(fwp=bins).rename({'fwp':'bin_center'})
-rcemip_pdf = rcemip_cdf.diff('bin_center')
+ds["fwp"] = ds["fwp"] * 1e-3
+# interpolate histogram
+rcemip_pdf = interpolate_bins(ds["f"].mean("model"), bins, "fwp")
 diff_rcemip = (rcemip_pdf.sel(SST=305) - rcemip_pdf.sel(SST=295)) / 10
 
-# %%
+# %% plot slopes
 fig, ax = plt.subplots()
 
-ax.plot(hists_monthly["ccic"].bin_center, slopes_monthly["ccic"], label="CCIC")
-ax.plot(hists_monthly["2c"].bin_center, slopes_monthly["2c"], label="2C-ICE")
-ax.plot(
-    hists_monthly["dardar"].bin_center, slopes_monthly["dardar"], label="DARDAR v3.10"
-)
+for ds in datasets:
+    ax.plot(
+        hists_monthly[ds].bin_center,
+        slopes_monthly[ds],
+        label=line_labels[ds],
+        color=colors[ds],
+    )
+
 for run in ["jed0022", "jed0033"]:
     ax.plot(
         iwp_change_icon[run].bin_center,
         iwp_change_icon[run],
-        label=f"ICON {experiments[run]}",
+        label=line_labels[run],
+        color=colors[run],
         linestyle="--",
     )
 
-ax.plot(diff_rcemip.bin_center, diff_rcemip, label="RCEMIP", linestyle=":")
+ax.plot(
+    diff_rcemip.bin_center,
+    diff_rcemip,
+    label=line_labels["rcemip"],
+    color=colors["rcemip"],
+    linestyle="--",
+)
 ax.axhline(0, color="k", linewidth=0.5)
 ax.set_xscale("log")
 
 ax.spines[["top", "right"]].set_visible(False)
-
+ax.set_ylabel("dP(I)/dT / K$^{-1}$")
+ax.set_xlabel("I / kg m$^{-2}$")
+ax.set_xlim(1e-3, 2e1)
 ax.legend()
+fig.tight_layout()
+fig.savefig("plots/slopes_monthly.png", dpi=300, bbox_inches="tight")
 
 # %% calculate feedback
 feedback = {}
 for ds in datasets:
-    feedback[ds] = (slopes_monthly[ds] * cre["net"].values).sum()
-    print(f"{ds} feedback: {feedback[ds].item():.3f} W/m2/K")
+    feedback[ds] = slopes_monthly[ds] * cre["net"].values
 for run in ["jed0022", "jed0033"]:
-    feedback[run] = (iwp_change_icon[run] * cre["net"].values).sum()
-    print(f"ICON {experiments[run]} feedback: {feedback[run].item():.3f} W/m2/K")
+    feedback[run] = iwp_change_icon[run] * cre["net"].values
 
-feedback["rcemip"] = (diff_rcemip * cre["net"].values).sum()
-print(f"RCEMIP feedback: {feedback['rcemip'].item():.3f} W/m2/K")
+feedback["rcemip"] = diff_rcemip * cre["net"].values
 
 
-# %%
+# %% plot feedback
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), width_ratios=[3, 1])
+offsets = {
+    "jed0033": 0.1,
+    "jed0022": 0.2,
+    "rcemip": 0.3,
+    "ccic": 0.4,
+    "2c": 0.5,
+    "dardar": 0.6,
+    "spare": 0.7,
+}
+
+members = datasets + ["rcemip"] + ["jed0022", "jed0033"]
+for ds in members:
+    axes[0].plot(
+        hists_monthly["ccic"].bin_center,
+        feedback[ds],
+        label=line_labels[ds],
+        color=colors[ds],
+        linestyle=linestyles[ds],
+    )
+
+    axes[1].scatter(
+        offsets[ds],
+        feedback[ds].sum().item(),
+        color=colors[ds],
+    )
+
+for ax in axes:
+    ax.axhline(0, color="k", linewidth=0.5)
+    ax.spines[["top", "right"]].set_visible(False)
+
+
+axes[0].set_xscale("log")
+axes[0].set_xlim(1e-3, 2e1)
+axes[0].set_ylabel("$F_{\mathrm{IWP}}(I)$ / W m$^{-2}$ K$^{-1}$")
+axes[0].set_xlabel("I / kg m$^{-2}$")
+axes[0].legend()
+axes[1].set_xticks(list(offsets.values()))
+labels = [line_labels[ds] for ds in list(offsets.keys())]
+axes[1].set_xticklabels(labels, rotation=45, ha="right")
+axes[1].set_ylabel("$F_{\mathrm{IWP}}$ / W m$^{-2}$ K$^{-1}$")
+fig.tight_layout()
+fig.savefig("plots/feedback_monthly.png", dpi=300, bbox_inches="tight")
+
+
 # %%
 fig, ax = plt.subplots()
 
@@ -358,6 +474,7 @@ for run in ["jed0022", "jed0033"]:
         label=f"ICON {experiments[run]}",
         linestyle="--",
     )
+
 
 ax.axhline(0, color="k", linewidth=0.5)
 ax.set_xscale("log")

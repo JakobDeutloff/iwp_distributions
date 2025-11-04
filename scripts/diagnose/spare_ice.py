@@ -8,9 +8,6 @@ from tqdm import tqdm
 
 
 # %%
-hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
-
-# %%
 def open_spareice(path):
     files = []
     for file in os.listdir(path):
@@ -34,12 +31,14 @@ def calc_histogram(ds):
     iwp_hist['IWP_bincenters'] = iwp_hist['IWP_bincenters'] * 1e-3
     sizes = ds['N_pixels_lat'].sel(lat_center=slice(-30, 30)).sum(['lat_center'])
     # interpolate to new bins 
-    iwp_hist = iwp_hist.interp(IWP_bincenters=centers, method='linear')
+    iwp_cdf = iwp_hist.cumsum('IWP_bincenters')
+    iwp_cdf = iwp_cdf.interp(IWP_bincenters=bins)
+    iwp_hist_int = iwp_cdf.diff('IWP_bincenters')
 
     hist = xr.Dataset(
         {
-            "hist": (("bin_center", "time"), iwp_hist.values.T),
-            "sizes": (("time"), sizes.values),
+            "hist": (("bin_center", "time"), iwp_hist_int.values.T),
+            "size": (("time"), sizes.values),
         },
         coords={"bin_center": centers, "time": ds.time.values},
     )
@@ -61,7 +60,12 @@ base_path = "/work/um0878/users/mbrath/SPARE-ICE-Project/results/gridded_data/"
 years = [str(i) for i in range(2007, 2026)]
 satellites = {year: "metopb" if int(year) >= 2021 else "metopa" for year in years}
 
-data = [process_year(year) for year in tqdm(years)]
+with ProcessPoolExecutor(max_workers=19) as executor:
+    # Use tqdm to show progress
+    tqdm.pandas(desc="Processing years")
+    # Process each year in parallel
+    futures = [executor.submit(process_year, year) for year in years]
+    data = [future.result() for future in tqdm(futures, desc="Collecting results")]
 
 # %% concatenate data and save 
 data_all = xr.concat(data, dim='time')
