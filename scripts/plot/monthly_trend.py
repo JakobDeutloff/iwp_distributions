@@ -73,14 +73,8 @@ hists_monthly["dardar"] = hists_monthly["dardar"].where(
 
 # spareice
 hists_monthly["spare"] = hists_spare["hist"] / hists_spare["size"]
-# effectively masks year 2020
-x = (
-    np.abs(hists_monthly["spare"].mean("time") - hists_monthly["spare"]).sum(
-        "bin_center"
-    )
-    < 0.04
-)
-hists_monthly["spare"] = hists_monthly["spare"].where(x).transpose("bin_center", "time")
+hists_monthly["spare"] = hists_monthly["spare"].transpose("bin_center", "time")
+hists_monthly["spare"] = hists_monthly["spare"].sel(time=slice(None, "2025-07"))
 
 
 # %% fix time coordinates
@@ -98,9 +92,9 @@ files = glob.glob(path_t2m + "E5sf00_1M_*.grb")
 files_after_2000 = [
     f for f in files if int(re.search(r"_(\d{4})_", f).group(1)) >= 2000
 ]
-ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords")
+ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords").chunk({'time': 1, 'values':-1})
 
-#  slect tropics and calculate annual average
+# slect tropics and calculate annual average
 with ProgressBar():
     t_month = (
         ds["t2m"]
@@ -108,6 +102,7 @@ with ProgressBar():
         .mean("values")
         .compute()
     )
+
 
 t_month["time"] = pd.to_datetime(t_month["time"].dt.strftime("%Y-%m"))
 t_annual = t_month.resample(time="1YE").mean("time")
@@ -120,151 +115,109 @@ plot_hists(
 )
 
 # %% detrend and deseasonalize monthly values
+hists_deseason = {}
 
 # temperature
 t_detrend = xr.DataArray(detrend(t_month), coords=t_month.coords, dims=t_month.dims)
 t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby("time.month").mean(
     "time"
 )
-t_smooth = t_deseason.rolling(time=1, center=True).mean()
-t_smooth["time"] = pd.to_datetime(t_smooth["time"].dt.strftime("%Y-%m"))
 
-# histograms ccic
-hists_detrend = nan_detrend(hists_monthly["ccic"])
-hists_deseason = hists_detrend.groupby("time.month") - hists_detrend.groupby(
-    "time.month"
-).mean("time")
-hists_deseason["time"] = pd.to_datetime(hists_deseason["time"].dt.strftime("%Y-%m"))
-hists_smooth_ccic = (
-    hists_deseason.rolling(time=1, center=True).mean().isel(time=slice(1, -1))
-)
-hists_smooth_ccic["time"] = pd.to_datetime(
-    hists_smooth_ccic["time"].dt.strftime("%Y-%m")
-)
-hists_smooth["ccic"] = hists_smooth_ccic
-
-
-# histograms 2c-ice
-hists_2c_detrend = nan_detrend(hists_monthly["2c"])
-hists_2c_deseason = hists_2c_detrend.groupby("time.month") - hists_2c_detrend.groupby(
-    "time.month"
-).mean("time")
-hists_smooth_2c = (
-    hists_2c_deseason.rolling(time=1, center=True, min_periods=1)
-    .mean()
-    .where(hists_2c_detrend.notnull())
-)
-hists_smooth_2c["time"] = pd.to_datetime(hists_smooth_2c["time"].dt.strftime("%Y-%m"))
-hists_smooth["2c"] = hists_smooth_2c
-
-# histograms dardar
-hists_dardar_detrend = nan_detrend(hists_monthly["dardar"])
-hists_dardar_deseason = hists_dardar_detrend.groupby(
-    "time.month"
-) - hists_dardar_detrend.groupby("time.month").mean("time")
-hists_smooth_dardar = (
-    hists_dardar_deseason.rolling(time=1, center=True, min_periods=1)
-    .mean()
-    .where(hists_dardar_detrend.notnull())
-)
-hists_smooth["dardar"] = hists_smooth_dardar
-
-# histograms spareice
-hists_spare_detrend = nan_detrend(hists_monthly["spare"])
-hists_spare_deseason = hists_spare_detrend.groupby(
-    "time.month"
-) - hists_spare_detrend.groupby("time.month").mean("time")
-hists_smooth_spare = (
-    hists_spare_deseason.rolling(time=1, center=True, min_periods=1)
-    .mean()
-    .where(hists_spare_detrend.notnull())
-)
-hists_smooth["spare"] = hists_smooth_spare
+for ds in datasets:
+    hists_detrend = nan_detrend(hists_monthly[ds])
+    hists_deseason_ds = hists_detrend.groupby("time.month") - hists_detrend.groupby(
+        "time.month"
+    ).mean("time")
+    hists_deseason_ds["time"] = pd.to_datetime(
+        hists_deseason_ds["time"].dt.strftime("%Y-%m")
+    )
+    hists_deseason[ds] = hists_deseason_ds
 
 # %%regression
 slopes_ccic = []
 err_ccic = []
-temp_vals_ccic = t_month.sel(time=hists_deseason.time).values
-for i in range(hists_deseason.bin_center.size):
-    hist_vals = hists_deseason.isel(bin_center=i).values
-    res = linregress(temp_vals_ccic, hist_vals)
-    slopes_ccic.append(res.slope)
-    err_ccic.append(res.stderr)
+for ds in datasets:
+    slopes_ds = []
+    err_ds = []
+    hist_vals = hists_deseason[ds].where(hists_deseason[ds].notnull(), drop=True)
+    temp = t_deseason.sel(time=hist_vals.time)
+    for i in range(hists_deseason[ds].bin_center.size):
+        hist_row = hist_vals.isel(bin_center=i).values
+        res = linregress(temp.values, hist_row)
+        slopes_ds.append(res.slope)
+        err_ds.append(res.stderr)
+    slopes_monthly[ds] = xr.DataArray(
+        slopes_ds,
+        coords={"bin_center": hists_deseason[ds].bin_center},
+        dims=["bin_center"],
+    )
+    error_montly[ds] = xr.DataArray(
+        err_ds,
+        coords={"bin_center": hists_deseason[ds].bin_center},
+        dims=["bin_center"],
+    )
+# %% calculate seasonal means
+hists_season = {}
+t_season = t_detrend.groupby("time.month").mean("time")
+for key in datasets:
+    hists_season[key] = hists_monthly[key].groupby("time.month").mean(
+        "time"
+    ) - hists_monthly[key].mean("time")
 
-slopes_monthly["ccic"] = xr.DataArray(
-    slopes_ccic, coords={"bin_center": hists_deseason.bin_center}, dims=["bin_center"]
-)
-error_montly["ccic"] = xr.DataArray(
-    err_ccic, coords={"bin_center": hists_deseason.bin_center}, dims=["bin_center"]
-)
+# %% regression seasonal means
+slopes_season = {}
+error_season = {}
+for key in datasets:
+    slopes = []
+    error = []
+    for i in range(hists_season[key].bin_center.size):
+        hist_vals = hists_season[key].isel(bin_center=i).values
+        res = linregress(t_season.values, hist_vals)
+        slopes.append(res.slope)
+        error.append(res.stderr)
+    slopes_season[key] = xr.DataArray(
+        slopes,
+        coords={"bin_center": hists_season[key].bin_center},
+        dims=["bin_center"],
+    )
+    error_season[key] = xr.DataArray(
+        error,
+        coords={"bin_center": hists_season[key].bin_center},
+        dims=["bin_center"],
+    )
+# %% save slopes
+with open("/work/bm1183/m301049/iwp_dists/slopes_monthly.pkl", "wb") as f:
+    pickle.dump(slopes_monthly, f)
+with open("/work/bm1183/m301049/iwp_dists/error_monthly.pkl", "wb") as f:
+    pickle.dump(error_montly, f)
+with open("/work/bm1183/m301049/iwp_dists/slopes_season.pkl", "wb") as f:
+    pickle.dump(slopes_season, f)
+with open("/work/bm1183/m301049/iwp_dists/error_season.pkl", "wb") as f:
+    pickle.dump(error_season, f)
 
-slopes_2c = []
-err_2c = []
-hists_dummy = hists_smooth["2c"].where(hists_2c_deseason.notnull(), drop=True)
-temp_vals_2c = t_smooth.sel(time=hists_dummy.time).values
-for i in range(hists_dummy.bin_center.size):
-    hist_vals = hists_dummy.isel(bin_center=i).values
-    res = linregress(temp_vals_2c, hist_vals)
-    slopes_2c.append(res.slope)
-    err_2c.append(res.stderr)
-
-slopes_monthly["2c"] = xr.DataArray(
-    slopes_2c, coords={"bin_center": hists_smooth["2c"].bin_center}, dims=["bin_center"]
-)
-error_montly["2c"] = xr.DataArray(
-    err_2c, coords={"bin_center": hists_smooth["2c"].bin_center}, dims=["bin_center"]
-)
-
-slopes_dardar = []
-err_dardar = []
-hists_dummy = hists_smooth["dardar"].where(hists_dardar_deseason.notnull(), drop=True)
-temp_vals_dardar = t_smooth.sel(time=hists_dummy.time).values
-for i in range(hists_dummy.bin_center.size):
-    hist_vals = hists_dummy.isel(bin_center=i).values
-    res = linregress(temp_vals_dardar, hist_vals)
-    slopes_dardar.append(res.slope)
-    err_dardar.append(res.stderr)
-
-slopes_monthly["dardar"] = xr.DataArray(
-    slopes_dardar,
-    coords={"bin_center": hists_smooth["dardar"].bin_center},
-    dims=["bin_center"],
-)
-error_montly["dardar"] = xr.DataArray(
-    err_dardar,
-    coords={"bin_center": hists_smooth["dardar"].bin_center},
-    dims=["bin_center"],
-)
-
-slopes_spare = []
-err_spare = []
-hists_dummy = (
-    hists_smooth["spare"]
-    .where(hists_spare_deseason.notnull(), drop=True)
-    .sel(time=slice(None, "2025-06"))
-)
-temp_vals_spare = t_smooth.sel(time=hists_dummy.time).values
-for i in range(hists_dummy.bin_center.size):
-    hist_vals = hists_dummy.isel(bin_center=i).values
-    res = linregress(temp_vals_spare, hist_vals)
-    slopes_spare.append(res.slope)
-    err_spare.append(res.stderr)
-
-slopes_monthly["spare"] = xr.DataArray(
-    slopes_spare,
-    coords={"bin_center": hists_smooth["spare"].bin_center},
-    dims=["bin_center"],
-)
-error_montly["spare"] = xr.DataArray(
-    err_spare,
-    coords={"bin_center": hists_smooth["spare"].bin_center},
-    dims=["bin_center"],
-)
+# %% plot seasonal slopes
+fig, ax = plt.subplots()
+for ds in datasets:
+    ax.plot(
+        hists_season[ds].bin_center,
+        slopes_season[ds],
+        label=line_labels[ds],
+        color=colors[ds],
+    )
+    ax.fill_between(
+        hists_season[ds].bin_center,
+        slopes_season[ds] - error_season[ds],
+        slopes_season[ds] + error_season[ds],
+        color=colors[ds],
+        alpha=0.3,
+    )
+ax.axhline(0, color="k", linewidth=0.5)
+ax.set_xscale("log")
 
 # %%
 fig, axes = plot_regression(
-    t_smooth,
-    hists_deseason,
+    t_deseason.sel(time=hists_deseason["ccic"].time),
+    hists_deseason["ccic"],
     slopes_monthly["ccic"],
     error_montly["ccic"],
     "CCIC Monthly",
@@ -272,8 +225,8 @@ fig, axes = plot_regression(
 fig.savefig("plots/ccic_monthly.png", dpi=300, bbox_inches="tight")
 # %%
 fig, axes = plot_regression(
-    t_smooth,
-    hists_smooth["2c"],
+    t_deseason.sel(time=hists_deseason["2c"].time),
+    hists_deseason["2c"],
     slopes_monthly["2c"],
     error_montly["2c"],
     "2C-ICE Monthly",
@@ -282,8 +235,8 @@ fig.savefig("plots/2c_monthly.png", dpi=300, bbox_inches="tight")
 
 # %%
 fig, axes = plot_regression(
-    t_smooth,
-    hists_smooth["dardar"],
+    t_deseason.sel(time=hists_deseason["dardar"].time),
+    hists_deseason["dardar"],
     slopes_monthly["dardar"],
     error_montly["dardar"],
     "DARDAR v3.10 Monthly",
@@ -292,8 +245,8 @@ fig.savefig("plots/dardar_monthly.png", dpi=300, bbox_inches="tight")
 
 # %%
 fig, axes = plot_regression(
-    t_smooth.sel(time=slice(None, "2025-07")),
-    hists_smooth["spare"].sel(time=slice(None, "2025-07")),
+    t_deseason.sel(time=slice(None, "2025-07")),
+    hists_deseason["spare"].sel(time=slice(None, "2025-07")),
     slopes_monthly["spare"],
     error_montly["spare"],
     "SPARE-ICE Monthly",
@@ -338,7 +291,7 @@ cre["iwp"] = np.log10(cre["iwp"])
 cre = cre.interp(
     iwp=np.log10(hists_monthly["ccic"].bin_center), method="linear"
 ).drop_vars("iwp")
-cre['bin_center'] = 10 ** cre['bin_center']
+cre["bin_center"] = 10 ** cre["bin_center"]
 iwp_change_icon = {}
 temp_deltas = {"jed0022": 4, "jed0033": 2}
 for run in ["jed0022", "jed0033"]:
@@ -392,6 +345,46 @@ ax.set_xlim(1e-3, 2e1)
 ax.legend()
 fig.tight_layout()
 fig.savefig("plots/slopes_monthly.png", dpi=300, bbox_inches="tight")
+
+# %% plot slopes in %/K
+fig, ax = plt.subplots()
+
+for ds in datasets:
+    ax.plot(
+        hists_monthly[ds].bin_center,
+        slopes_monthly[ds] * 100 / hists_monthly[ds].mean("time"),
+        label=line_labels[ds],
+        color=colors[ds],
+    )
+
+for run in ["jed0022", "jed0033"]:
+    ax.plot(
+        iwp_change_icon[run].bin_center,
+        iwp_change_icon[run] * 100 / iwp_hists_int["jed0011"],
+        label=line_labels[run],
+        color=colors[run],
+        linestyle="--",
+    )
+
+ax.plot(
+    diff_rcemip.bin_center,
+    diff_rcemip * 100 / rcemip_pdf.sel(SST=295),
+    label=line_labels["rcemip"],
+    color=colors["rcemip"],
+    linestyle="--",
+)
+
+ax.axhline(0, color="k", linewidth=0.5)
+ax.set_xscale("log")
+
+ax.spines[["top", "right"]].set_visible(False)
+ax.set_ylabel("dP(I)/dT / % K$^{-1}$")
+ax.set_xlabel("I / kg m$^{-2}$")
+ax.set_xlim(1e-3, 2e1)
+ax.set_ylim(-15, 15)
+ax.legend()
+fig.tight_layout()
+fig.savefig("plots/slopes_monthly_perc.png", dpi=300, bbox_inches="tight")
 
 # %% calculate feedback
 feedback = {}

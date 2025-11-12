@@ -1,10 +1,11 @@
 # %% import
-import matplotlib.pyplot as plt
 import xarray as xr
 import numpy as np
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
+from src.helper_functions import shift_longitudes
+
 
 # %% def functions
 def read_cloudsat(year):
@@ -48,7 +49,7 @@ cloudsat_xr = cloudsat_xr.assign(
         )
     }
 )
-# %% calculate histograms for every month
+cloudsat_xr = cloudsat_xr.pipe(shift_longitudes, lon_name='lon')
 
 bins = np.logspace(-3, 2, 254)[::4]
 mask_daytime = (cloudsat_xr.sel(time="2007-01")["local_time"] >= 6) & (
@@ -99,4 +100,3 @@ hists = xr.Dataset(
 # %% save hists 
 path = '/work/bm1183/m301049/cloudsat/dists.nc'
 hists.to_netcdf(path)
-

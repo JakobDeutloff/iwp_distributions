@@ -67,28 +67,23 @@ t_detrend = xr.DataArray(detrend(t_month), coords=t_month.coords, dims=t_month.d
 t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby("time.month").mean(
     "time"
 )
-t_smooth = t_deseason.rolling(time=1, center=True).mean()
-t_smooth["time"] = pd.to_datetime(t_smooth["time"].dt.strftime("%Y-%m"))
+t_deseason["time"] = pd.to_datetime(t_deseason["time"].dt.strftime("%Y-%m"))
 
 # histograms ccic
-hists_detrend = nan_detrend(hists_ccic_monthly)
+hists_detrend = nan_detrend(hists_ccic_monthly, dim='local_time')
 hists_deseason = hists_detrend.groupby("time.month") - hists_detrend.groupby(
     "time.month"
 ).mean("time")
 hists_deseason["time"] = pd.to_datetime(hists_deseason["time"].dt.strftime("%Y-%m"))
-hists_smooth_ccic = (
-    hists_deseason.rolling(time=1, center=True).mean().isel(time=slice(1, -1))
-)
-hists_smooth_ccic["time"] = pd.to_datetime(
-    hists_smooth_ccic["time"].dt.strftime("%Y-%m")
+hists_deseason["time"] = pd.to_datetime(
+    hists_deseason["time"].dt.strftime("%Y-%m")
 )
 
 # %% regression 
-
 slopes_ccic = []
 err_ccic = []
-hists_dummy = hists_smooth_ccic.where(hists_deseason.notnull(), drop=True)
-temp_vals_ccic = t_smooth.sel(time=hists_dummy.time).values
+hists_dummy = hists_deseason.where(hists_deseason.notnull(), drop=True)
+temp_vals_ccic = t_deseason.sel(time=hists_dummy.time).values
 for i in range(hists_dummy.local_time.size):
     hist_vals = hists_dummy.isel(local_time=i).values
     slope, intercept, r_value, p_value, std_err = linregress(
@@ -104,6 +99,34 @@ slopes_ccic = xr.DataArray(
 )
 err_ccic = xr.DataArray(
     err_ccic,
+    coords={"local_time": hists_dummy.local_time},
+    dims=["local_time"],
+)
+
+# %% annual trend 
+hists_annual = hists_ccic.resample(time="1YE").sum()
+hists_annual = hists_annual['hist'] / hists_annual['size']
+
+hists_annual_detrend = nan_detrend(hists_annual, dim='local_time')
+
+slopes_annual =[]
+err_annual = []
+hists_dummy = hists_annual_detrend.where(hists_annual_detrend.notnull(), drop=True)
+temp_vals_annual = t_annual.sel(time=hists_dummy.time).values
+for i in range(hists_dummy.local_time.size):
+    hist_vals = hists_dummy.isel(local_time=i).values
+    slope, intercept, r_value, p_value, std_err = linregress(
+        temp_vals_annual, hist_vals
+    )
+    slopes_annual.append(slope)
+    err_annual.append(std_err)
+slopes_annual = xr.DataArray(
+    slopes_annual,
+    coords={"local_time": hists_dummy.local_time},
+    dims=["local_time"],
+)
+err_annual = xr.DataArray(
+    err_annual,
     coords={"local_time": hists_dummy.local_time},
     dims=["local_time"],
 )
@@ -152,18 +175,28 @@ ax.legend()
 fig.tight_layout()
 fig.savefig("plots/daily_cycle_mean.png", dpi=300, bbox_inches="tight")
 
-# %% plot cahnge in diurnal cycle 
+# %% plot change in diurnal cycle 
 fig, ax = plt.subplots(figsize=(8, 5))
 mean_ccic = hists_ccic.mean('time')['hist']/hists_ccic.mean('time')['size']
-# ax.plot(slopes_ccic["local_time"], slopes_ccic*100/mean_ccic, label="CCIC", color=colors['ccic'], linewidth=2)
 
-# ax.fill_between(
-#     slopes_ccic["local_time"],
-#     slopes_ccic*100/mean_ccic - err_ccic*100/mean_ccic,
-#     slopes_ccic*100/mean_ccic + err_ccic*100/mean_ccic,
-#     alpha=0.3,
-#     color=colors['ccic']
-# )
+ax.plot(slopes_ccic["local_time"], slopes_ccic*100/mean_ccic, label="CCIC", color=colors['ccic'], linewidth=2)
+ax.plot(slopes_annual["local_time"], slopes_annual*100/mean_ccic, label="CCIC annual", color='darkblue', linewidth=2)
+
+ax.fill_between(
+    slopes_ccic["local_time"],
+    slopes_ccic*100/mean_ccic - err_ccic*100/mean_ccic,
+    slopes_ccic*100/mean_ccic + err_ccic*100/mean_ccic,
+    alpha=0.3,
+    color=colors['ccic']
+)
+
+ax.fill_between(
+    slopes_annual["local_time"],
+    slopes_annual*100/mean_ccic - err_annual*100/mean_ccic,
+    slopes_annual*100/mean_ccic + err_annual*100/mean_ccic,
+    alpha=0.3,
+    color='darkblue'
+)
 for run in runs[1:]:
     ax.plot(
         slopes_ccic["local_time"],
@@ -178,6 +211,6 @@ ax.set_xlim([0, 23.9])
 ax.set_ylim([-4.1, 3])
 ax.legend()
 fig.tight_layout()
-fig.savefig("plots/daily_cycle_change_icon.png", dpi=300, bbox_inches="tight")
+fig.savefig("plots/daily_cycle_change.png", dpi=300, bbox_inches="tight")
 
 # %%

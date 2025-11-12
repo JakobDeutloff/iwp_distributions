@@ -4,13 +4,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from src.helper_functions import shift_longitudes
 
 # %%
 years = np.arange(2006, 2020)
 batch_idxs = np.arange(0, 10)
 # %% open dataset
 def calc_histogram(year, batch_idx):
-    ds = xr.open_dataset(f'/work/bm1183/m301049/dardarv3.10/{year}/iwp_dardar_{year}_{batch_idx}.nc').load()
+    ds = xr.open_dataset(f'/work/bm1183/m301049/dardarv3.10/{year}/iwp_dardar_{year}_{batch_idx}.nc').load().pipe(shift_longitudes)
     # get day timestamps
     days = np.unique(ds['time'].dt.floor('D'))
     days = [str(pd.to_datetime(day).date()) for day in days]
