@@ -9,6 +9,12 @@ from src.helper_functions import shift_longitudes
 # %%
 years = np.arange(2006, 2020)
 batch_idxs = np.arange(0, 10)
+
+# %% open land-sea mask and define subregions 
+mask = xr.open_dataset('/work/bm1183/m301049/orcestra/sea_land_mask.nc').pipe(shift_longitudes, lon_name='lon')
+lon_min_twp = 120
+lon_max_twp = 180
+
 # %% open dataset
 def calc_histogram(year, batch_idx):
     ds = xr.open_dataset(f'/work/bm1183/m301049/dardarv3.10/{year}/iwp_dardar_{year}_{batch_idx}.nc').load().pipe(shift_longitudes)
@@ -18,15 +24,17 @@ def calc_histogram(year, batch_idx):
     # select tropics and daytime
     local_time = np.array((ds["longitude"].values / 15 + ds["time"].dt.hour.values) % 24)
     mask_daytime = (local_time >= 6) & (local_time <= 18)
-    ds_trop = ds.where((ds['latitude'] < 30) & (ds['latitude'] > -30) & mask_daytime, drop=True)
+    mask_geo = (ds['latitude'] >= -30) & (ds['latitude'] <= 30)
+    mask_sea = mask['mask'].sel(lon=ds['longitude'], lat=ds['latitude'], method='nearest')
+    ds_selection = ds.where(mask_geo & mask_daytime & mask_sea, drop=True)
     # calculate histogram
     hist_list = []
     size_list = []
     time_stamps = []
     for day in days:
         bins = bins = np.logspace(-3, 2, 254)[::4]
-        len_data = np.isfinite(ds_trop['iwp'].sel(time=day)).sum()
-        hist, _ = np.histogram(ds_trop['iwp'].sel(time=day).values, bins=bins, density=False)
+        len_data = np.isfinite(ds_selection['iwp'].sel(time=day)).sum()
+        hist, _ = np.histogram(ds_selection['iwp'].sel(time=day).values, bins=bins, density=False)
         hist_list.append(hist)
         size_list.append(len_data)
         time_stamps.append(day)
@@ -42,6 +50,7 @@ def calc_histogram(year, batch_idx):
         },
     )
     return hists
+
 # %%
 hists_list = []
 year_batch_pairs = [(year, batch_idx) for year in years for batch_idx in batch_idxs]
@@ -62,5 +71,5 @@ histogram = histogram.groupby('time').sum()
 histogram['hist'] = histogram['hist'].transpose('bin_center', 'time')
 
 # %% save
-histogram.to_netcdf('/work/bm1183/m301049/dardarv3.10/hist_dardar.nc')
+histogram.to_netcdf('/work/bm1183/m301049/dardarv3.10/hist_dardar_sea.nc')
 # %%

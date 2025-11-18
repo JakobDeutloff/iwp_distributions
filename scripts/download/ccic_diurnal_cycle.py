@@ -15,6 +15,13 @@ month = sys.argv[2]
 s3 = s3fs.S3FileSystem(anon=True)
 prefix = f"chalmerscloudiceclimatology/record/cpcir/{year}/ccic_cpcir_{year}{month}*"
 files = s3.glob(prefix)
+mask = xr.open_dataarray('/work/bm1183/m301049/orcestra/sea_land_mask.nc')
+mask = mask.sel(lat=slice(-30, 30)).load()
+
+ds = xr.open_zarr(s3.get_mapper(files[0]))
+ds = ds.sel(latitude=slice(30, -30)).load()
+
+mask_sea = mask.sel(lon=ds['longitude'], lat=ds['latitude'], method='nearest').drop_vars(['lon', 'lat'])
 # %%
 local_dir = f"/work/bm1183/m301049/ccic_daily_cycle/{year}/"
 os.makedirs(local_dir, exist_ok=True)
@@ -23,7 +30,7 @@ bins = np.arange(0, 25, 1)
 
 def calculate_daily_cycle_distribution(file_path):
     ds = xr.open_zarr(s3.get_mapper(file_path))
-    ds = ds.sel(latitude=slice(30, -30)).load()
+    ds = ds.sel(latitude=slice(20, -20)).load()
 
     container = xr.Dataset(
         {
@@ -45,7 +52,7 @@ def calculate_daily_cycle_distribution(file_path):
                 "local_time": (("latitude", "longitude"), np.tile(local_time.values, (ds_ts["latitude"].size, 1))),
             }
         )
-        times_conv = ds_ts['local_time'].where(ds_ts['tiwp']>1)
+        times_conv = ds_ts['local_time'].where((ds_ts['tiwp']>1) & mask_sea)
         hist, _ = np.histogram(times_conv.values, bins=bins, density=False)
         size = np.isfinite(times_conv).sum().item()
         container["hist"][:, i] = hist
@@ -65,7 +72,9 @@ all_data["size"].attrs = {
     "description": "Total number of IWP samples > 1 kg/m2 used to compute the histogram for each time",
     "units": "counts",
 }
-path = os.path.join(local_dir, f"ccic_cpcir_daily_cycle_distribution_{year}{month}.nc")
+path = os.path.join(local_dir, f"ccic_cpcir_daily_cycle_distribution_sea_20_{year}{month}.nc")
 if os.path.exists(path):
     os.remove(path)
 all_data.to_netcdf(path)
+
+# %%

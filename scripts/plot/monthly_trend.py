@@ -43,10 +43,18 @@ hists_ccic = xr.concat(hist_list, dim="time")
 hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
 
 # %% open dardar
-hists_dardar = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
+hists_dardar = (
+    xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
+    .resample(time="1ME")
+    .sum()
+)
 
 # %% open spareice
 hists_spare = xr.open_dataset("/work/bm1183/m301049/spareice/hists_metop.nc")
+
+# %% filter 2c_ice and dadar data
+hists_2c = hists_2c.where(hists_2c["size"] > 2.2e6)
+hists_dardar = hists_dardar.where(hists_dardar["size"] > 2.2e6)
 
 # %% coarsen histograms and normalise by size
 hists_ccic_coarse = hists_ccic.coarsen(bin_center=4, boundary="trim").sum()
@@ -63,12 +71,8 @@ hists_monthly["2c"] = (hists_2c["hist"] / hists_2c["size"]).sel(
 )
 
 # dardar
-hists_monthly["dardar"] = (
-    hists_dardar["hist"].resample(time="1ME").sum()
-    / hists_dardar["size"].resample(time="1ME").sum()
-).sel(time=slice("2006-06", "2017-12"))
-hists_monthly["dardar"] = hists_monthly["dardar"].where(
-    hists_dardar["size"].resample(time="1ME").sum() > 2.1e6
+hists_monthly["dardar"] = (hists_dardar["hist"] / hists_dardar["size"]).sel(
+    time=slice("2006-06", "2017-12")
 )
 
 # spareice
@@ -92,7 +96,9 @@ files = glob.glob(path_t2m + "E5sf00_1M_*.grb")
 files_after_2000 = [
     f for f in files if int(re.search(r"_(\d{4})_", f).group(1)) >= 2000
 ]
-ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords").chunk({'time': 1, 'values':-1})
+ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords").chunk(
+    {"time": 1, "values": -1}
+)
 
 # slect tropics and calculate annual average
 with ProgressBar():
@@ -109,7 +115,7 @@ t_annual = t_month.resample(time="1YE").mean("time")
 
 # %%
 plot_hists(
-    hists_monthly["spare"].sel(time=slice("2007-05", "2025-07")),
+    hists_monthly["dardar"].sel(time=slice("2007-05", "2025-07")),
     t_month.sel(time=slice("2007-05", "2025-07")),
     bins,
 )
@@ -236,7 +242,7 @@ fig.savefig("plots/2c_monthly.png", dpi=300, bbox_inches="tight")
 # %%
 fig, axes = plot_regression(
     t_deseason.sel(time=hists_deseason["dardar"].time),
-    hists_deseason["dardar"],
+    hists_deseason["dardar"].T,
     slopes_monthly["dardar"],
     error_montly["dardar"],
     "DARDAR v3.10 Monthly",

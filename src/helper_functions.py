@@ -51,6 +51,28 @@ def interpolate_bins(hist, new_bins, name_old_bins):
 def shift_longitudes(ds, lon_name='longitude'):
     """Shift longitudes from [-180, 180] to [0, 360]"""
     lon_shifted = ds[lon_name].values.copy()
-    lon_shifted[ds[lon_name].values < 0] += 360
-    ds[lon_name].values = lon_shifted
+    lon_shifted[ds[lon_name].values < 0] += 360.0
+    if lon_name in ds.dims:
+        ds = ds.assign_coords({lon_name: lon_shifted})
+        ds = ds.sortby(lon_name)
+    else:
+        ds[lon_name].values = lon_shifted
     return ds
+
+def read_ccic_dc(filename):
+    path = "/work/bm1183/m301049/ccic_daily_cycle/"
+    years = range(2000, 2024)
+    months = [f"{i:02d}" for i in range(1, 13)]
+    hist_list = []
+    for year in years:
+        for month in months:
+            try:
+                ds = xr.open_dataset(
+                    f"{path}{year}/{filename}{year}{month}.nc"
+                )
+                hist_list.append(ds)
+            except FileNotFoundError:
+                print(f"File for {year}-{month} not found, skipping.")
+
+    hists_ccic = xr.concat(hist_list, dim="time")
+    return hists_ccic

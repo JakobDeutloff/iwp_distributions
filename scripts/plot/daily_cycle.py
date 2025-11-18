@@ -1,12 +1,12 @@
-# %% 
-import xarray as xr 
+# %%
+import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import glob
-import re 
+import re
 from dask.diagnostics import ProgressBar
-from src.helper_functions import nan_detrend
+from src.helper_functions import nan_detrend, shift_longitudes, read_ccic_dc
 from src.plot import definitions
 from scipy.signal import detrend
 from scipy.stats import linregress
@@ -15,27 +15,30 @@ from scipy.stats import linregress
 colors, line_labels, linestyles = definitions()
 
 # %% open CCIC
-path = "/work/bm1183/m301049/ccic_daily_cycle/"
-years = range(2000, 2024)
-months = [f"{i:02d}" for i in range(1, 13)]
-hist_list = []
-for year in years:
-    for month in months:
-        try:
-            ds = xr.open_dataset(
-                f"{path}{year}/ccic_cpcir_daily_cycle_distribution_{year}{month}.nc"
-            )
-            hist_list.append(ds)
-        except FileNotFoundError:
-            print(f"File for {year}-{month} not found, skipping.")
+hists = {}
+names = ['all', 'sea', 'land']
+hists['sea'] = read_ccic_dc("ccic_cpcir_daily_cycle_distribution_sea_")
+hists['all'] = read_ccic_dc("ccic_cpcir_daily_cycle_distribution_")
+hists['land'] = hists['all'] - hists['sea']
 
-hists_ccic = xr.concat(hist_list, dim="time")
+# %%
+mask = (
+    xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+    .load()
+    .pipe(shift_longitudes, lon_name="lon")
+)
 
-# %% 
-hists_ccic_monthly = hists_ccic.resample(time="1ME").sum()
-hists_ccic_monthly['time'] = pd.to_datetime(hists_ccic_monthly['time'].dt.strftime('%Y-%m'))
-hists_ccic_monthly = hists_ccic_monthly['hist'] / hists_ccic_monthly['size']
-hists_ccic_monthly = hists_ccic_monthly.transpose('local_time', 'time')
+# %%
+def resample_histograms(hist):
+    hist_monthly = hist.resample(time="1ME").sum()
+    hist_monthly["time"] = pd.to_datetime(hist_monthly["time"].dt.strftime("%Y-%m"))
+    hist_monthly = hist_monthly["hist"] / hist_monthly["size"]
+    hist_monthly = hist_monthly.transpose("local_time", "time")
+    return hist_monthly
+
+hists_monthly = {}
+for name in names:
+    hists_monthly[name] = resample_histograms(hists[name])
 
 # %% load era5 surface temp
 path_t2m = "/pool/data/ERA5/E5/sf/an/1M/167/"
@@ -48,95 +51,89 @@ files_after_2000 = [
 ]
 ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords")
 
-#  slect tropics and calculate annual average
-with ProgressBar():
-    t_month = (
-        ds["t2m"]
-        .where((ds["latitude"] >= -30) & (ds["latitude"] <= 30))
-        .mean("values")
-        .compute()
+mask_trop = mask.sel(
+    lat=ds.isel(time=0).latitude, lon=ds.isel(time=0).longitude, method="nearest"
+)
+
+temps = {}
+masks = {
+    'all': True,
+    'sea': mask_trop,
+    'land': ~mask_trop,
+}
+
+def get_montly_temp(mask):
+    with ProgressBar():
+        temp = (
+            ds["t2m"]
+            .where((ds["latitude"] >= -30) & (ds["latitude"] <= 30) & mask)
+            .mean('values')
+            .compute()
+        )
+    temp["time"] = pd.to_datetime(temp["time"].dt.strftime("%Y-%m"))
+    return temp
+
+for name in names:
+    temps[name] = get_montly_temp(masks[name])
+
+
+# %%  detrend and deseasonalize
+
+def detrend_temp(t):
+    t_detrend = xr.DataArray(detrend(t), coords=t.coords, dims=t.dims)
+    t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby(
+        "time.month"
+    ).mean("time")
+    t_deseason["time"] = pd.to_datetime(t_deseason["time"].dt.strftime("%Y-%m"))
+    return t_deseason
+
+def detrend_hist(hist):
+    hist_detrend = nan_detrend(hist, dim="local_time")
+    hist_deseason = hist_detrend.groupby("time.month") - hist_detrend.groupby(
+        "time.month"
+    ).mean("time")
+    hist_deseason["time"] = pd.to_datetime(hist_deseason["time"].dt.strftime("%Y-%m"))
+    return hist_deseason
+
+for name in names:
+    temps[name] = detrend_temp(temps[name])
+    hists_monthly[name] = detrend_hist(hists_monthly[name])
+
+# %% regression
+slopes = {}
+err = {}
+
+def regress_hist_temp(hist, temp):
+    slopes = []
+    err = []
+    hist_dummy = hist.where(hist.notnull(), drop=True)
+    temp_vals = temp.sel(time=hist_dummy.time).values
+    for i in range(hist_dummy.local_time.size):
+        hist_vals = hist_dummy.isel(local_time=i).values
+        slope, intercept, r_value, p_value, std_err = linregress(temp_vals, hist_vals)
+        slopes.append(slope)
+        err.append(std_err)
+    slopes_da = xr.DataArray(
+        slopes,
+        coords={"local_time": hist_dummy.local_time},
+        dims=["local_time"],
     )
-
-t_month["time"] = pd.to_datetime(t_month["time"].dt.strftime("%Y-%m"))
-t_annual = t_month.resample(time="1YE").mean("time")
-
-# %%  detrend and deseasonalize 
-
-# temperature
-t_detrend = xr.DataArray(detrend(t_month), coords=t_month.coords, dims=t_month.dims)
-t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby("time.month").mean(
-    "time"
-)
-t_deseason["time"] = pd.to_datetime(t_deseason["time"].dt.strftime("%Y-%m"))
-
-# histograms ccic
-hists_detrend = nan_detrend(hists_ccic_monthly, dim='local_time')
-hists_deseason = hists_detrend.groupby("time.month") - hists_detrend.groupby(
-    "time.month"
-).mean("time")
-hists_deseason["time"] = pd.to_datetime(hists_deseason["time"].dt.strftime("%Y-%m"))
-hists_deseason["time"] = pd.to_datetime(
-    hists_deseason["time"].dt.strftime("%Y-%m")
-)
-
-# %% regression 
-slopes_ccic = []
-err_ccic = []
-hists_dummy = hists_deseason.where(hists_deseason.notnull(), drop=True)
-temp_vals_ccic = t_deseason.sel(time=hists_dummy.time).values
-for i in range(hists_dummy.local_time.size):
-    hist_vals = hists_dummy.isel(local_time=i).values
-    slope, intercept, r_value, p_value, std_err = linregress(
-        temp_vals_ccic, hist_vals
+    err_da = xr.DataArray(
+        err,
+        coords={"local_time": hist_dummy.local_time},
+        dims=["local_time"],
     )
-    slopes_ccic.append(slope)
-    err_ccic.append(std_err)
+    return slopes_da, err_da
 
-slopes_ccic = xr.DataArray(
-    slopes_ccic,
-    coords={"local_time": hists_dummy.local_time},
-    dims=["local_time"],
-)
-err_ccic = xr.DataArray(
-    err_ccic,
-    coords={"local_time": hists_dummy.local_time},
-    dims=["local_time"],
-)
+for name in names:
+    slopes[name], err[name] = regress_hist_temp(hists_monthly[name], temps[name])
 
-# %% annual trend 
-hists_annual = hists_ccic.resample(time="1YE").sum()
-hists_annual = hists_annual['hist'] / hists_annual['size']
-
-hists_annual_detrend = nan_detrend(hists_annual, dim='local_time')
-
-slopes_annual =[]
-err_annual = []
-hists_dummy = hists_annual_detrend.where(hists_annual_detrend.notnull(), drop=True)
-temp_vals_annual = t_annual.sel(time=hists_dummy.time).values
-for i in range(hists_dummy.local_time.size):
-    hist_vals = hists_dummy.isel(local_time=i).values
-    slope, intercept, r_value, p_value, std_err = linregress(
-        temp_vals_annual, hist_vals
-    )
-    slopes_annual.append(slope)
-    err_annual.append(std_err)
-slopes_annual = xr.DataArray(
-    slopes_annual,
-    coords={"local_time": hists_dummy.local_time},
-    dims=["local_time"],
-)
-err_annual = xr.DataArray(
-    err_annual,
-    coords={"local_time": hists_dummy.local_time},
-    dims=["local_time"],
-)
-
-# %% load icon 
-runs = ['jed0011', 'jed0022', 'jed0033']
+# %% load icon
+runs = ["jed0011", "jed0022", "jed0033"]
 temp_delta = {
-    'jed0011': 0,
-    'jed0022': 4,
-    'jed0033': 2,
+    "jed0011": 0,
+    "jed0022": 4,
+    "jed0033": 2,
 }
 hists_icon = {}
 hists_raw = {}
@@ -149,18 +146,22 @@ for run in runs:
     ].values
 
 
-
 change_icon = {}
 for run in runs[1:]:
-    change_icon[run] = (
-        hists_icon[run] - hists_icon['jed0011']
-    ) / temp_delta[run]
+    change_icon[run] = (hists_icon[run] - hists_icon["jed0011"]) / temp_delta[run]
 
 # %% plot of mean daily cycle
-mean_ccic = hists_ccic.mean('time')
+mean_sea = hists['sea'].sum("time")
+
+
 fig, ax = plt.subplots(figsize=(8, 5))
 ax.stairs(
-    mean_ccic['hist']/mean_ccic['size'], np.arange(0, 25, 1), label=line_labels['ccic'], color=colors['ccic'], linewidth=2)
+    mean_sea["hist"] / mean_sea["size"],
+    np.arange(0, 25, 1),
+    label="CCIC Sea",
+    color='darkblue',
+    linewidth=2,
+)
 for run in runs:
     ax.stairs(
         hists_icon[run], np.arange(0, 25, 1), label=line_labels[run], color=colors[run]
@@ -175,32 +176,57 @@ ax.legend()
 fig.tight_layout()
 fig.savefig("plots/daily_cycle_mean.png", dpi=300, bbox_inches="tight")
 
-# %% plot change in diurnal cycle 
+# %% plot mean daily cycle all regions 
 fig, ax = plt.subplots(figsize=(8, 5))
-mean_ccic = hists_ccic.mean('time')['hist']/hists_ccic.mean('time')['size']
+color = {'all': 'black', 'sea': 'blue', 'land': 'green'}
 
-ax.plot(slopes_ccic["local_time"], slopes_ccic*100/mean_ccic, label="CCIC", color=colors['ccic'], linewidth=2)
-ax.plot(slopes_annual["local_time"], slopes_annual*100/mean_ccic, label="CCIC annual", color='darkblue', linewidth=2)
+for name in names:
+    mean_hist = hists[name].sum("time")
+    ax.stairs(
+        mean_hist["hist"] / mean_hist["size"],
+        np.arange(0, 25, 1),
+        label=f"CCIC {name}",
+        color=color[name],
+        linewidth=2,
+    )
 
-ax.fill_between(
-    slopes_ccic["local_time"],
-    slopes_ccic*100/mean_ccic - err_ccic*100/mean_ccic,
-    slopes_ccic*100/mean_ccic + err_ccic*100/mean_ccic,
-    alpha=0.3,
-    color=colors['ccic']
+ax.set_ylabel("P($I$ > 1 kg m$^{-2}$)")
+ax.set_ylim([0.02, 0.075])
+ax.set_xlim([0, 23.9])
+ax.set_xlabel("Local Time / h")
+ax.spines[["top", "right"]].set_visible(False)
+ax.legend()
+fig.tight_layout()
+fig.savefig("plots/daily_cycle_mean_all_regions.png", dpi=300, bbox_inches="tight")
+
+
+# %% plot change in diurnal cycle
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.axhline(0, color='k', linewidth=0.5)
+ccic_region = 'all'
+mean_ccic = hists[ccic_region].sum("time")["hist"] / hists[ccic_region].sum("time")["size"]
+
+ax.plot(
+    slopes[ccic_region]["local_time"],
+    slopes[ccic_region] * 100 / mean_ccic,
+    label="CCIC",
+    color=colors["ccic"],
+    linewidth=2,
 )
 
+
 ax.fill_between(
-    slopes_annual["local_time"],
-    slopes_annual*100/mean_ccic - err_annual*100/mean_ccic,
-    slopes_annual*100/mean_ccic + err_annual*100/mean_ccic,
+    slopes[ccic_region]["local_time"],
+    slopes[ccic_region] * 100 / mean_ccic - err[ccic_region] * 100 / mean_ccic,
+    slopes[ccic_region] * 100 / mean_ccic + err[ccic_region] * 100 / mean_ccic,
     alpha=0.3,
-    color='darkblue'
+    color=colors["ccic"],
 )
+
 for run in runs[1:]:
     ax.plot(
-        slopes_ccic["local_time"],
-        change_icon[run]*100/hists_icon['jed0011'],
+        slopes[ccic_region]["local_time"],
+        change_icon[run] * 100 / hists_icon["jed0011"],
         label=line_labels[run],
         color=colors[run],
     )
@@ -208,9 +234,38 @@ ax.set_ylabel("dP(I $>$ 1 kg m$^{-2}$)/dT / % K$^{-1}$")
 ax.set_xlabel("Local Time / h")
 ax.spines[["top", "right"]].set_visible(False)
 ax.set_xlim([0, 23.9])
-ax.set_ylim([-4.1, 3])
 ax.legend()
 fig.tight_layout()
 fig.savefig("plots/daily_cycle_change.png", dpi=300, bbox_inches="tight")
+
+# %% plot change in diurnal cycle all regions
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.axhline(0, color='k', linewidth=0.5)
+
+for name in names:
+    mean_ccic = hists[name].sum("time")["hist"] / hists[name].sum("time")["size"]
+    ax.plot(
+        slopes[name]["local_time"],
+        slopes[name] * 100 / mean_ccic,
+        label=f"CCIC {name}",
+        color=color[name],
+        linewidth=2,
+    )
+
+    ax.fill_between(
+        slopes[name]["local_time"],
+        slopes[name] * 100 / mean_ccic - err[name] * 100 / mean_ccic,
+        slopes[name] * 100 / mean_ccic + err[name] * 100 / mean_ccic,
+        alpha=0.3,
+        color=color[name],
+    )
+
+ax.set_ylabel("dP(I $>$ 1 kg m$^{-2}$)/dT / % K$^{-1}$")
+ax.set_xlabel("Local Time / h")
+ax.spines[["top", "right"]].set_visible(False)
+ax.set_xlim([0, 23.9])
+ax.legend()
+fig.tight_layout()
+fig.savefig("plots/daily_cycle_change_all_regions.png", dpi=300, bbox_inches="tight")
 
 # %%
