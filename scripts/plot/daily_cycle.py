@@ -16,10 +16,20 @@ colors, line_labels, linestyles = definitions()
 
 # %% open CCIC
 hists = {}
-names = ['all', 'sea', 'land']
+names = ['all', 'sea', 'land', 'gridsat']
 hists['sea'] = read_ccic_dc("ccic_cpcir_daily_cycle_distribution_sea_")
 hists['all'] = read_ccic_dc("ccic_cpcir_daily_cycle_distribution_")
 hists['land'] = hists['all'] - hists['sea']
+
+# %% open gridsat
+def process_gridsat(ds):
+    ds = ds.sortby("time")
+    return ds
+hist_gridsat = xr.open_mfdataset("/work/bm1183/m301049/gridsat/hourly/gridsat_2d_hist_*.nc", preprocess=process_gridsat).load()
+
+# %%
+hists['gridsat'] = hist_gridsat.sel(bt=slice(None, 220)).sum('bt')
+hists['gridsat']['size'] = hists['gridsat']['hist'].sum('local_time')
 
 # %%
 mask = (
@@ -47,7 +57,7 @@ files = glob.glob(path_t2m + "E5sf00_1M_*.grb")
 
 # Filter files for year > 2000
 files_after_2000 = [
-    f for f in files if int(re.search(r"_(\d{4})_", f).group(1)) >= 2000
+    f for f in files if int(re.search(r"_(\d{4})_", f).group(1)) >= 1980
 ]
 ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords")
 
@@ -60,6 +70,7 @@ masks = {
     'all': True,
     'sea': mask_trop,
     'land': ~mask_trop,
+    'gridsat': True,
 }
 
 def get_montly_temp(mask):
@@ -178,13 +189,19 @@ fig.savefig("plots/daily_cycle_mean.png", dpi=300, bbox_inches="tight")
 
 # %% plot mean daily cycle all regions 
 fig, ax = plt.subplots(figsize=(8, 5))
-color = {'all': 'black', 'sea': 'blue', 'land': 'green'}
+color = {'all': 'black', 'sea': 'blue', 'land': 'green', 'gridsat': 'red'}
+bins = {
+    'all': np.arange(0, 25, 1),
+    'sea': np.arange(0, 25, 1),
+    'land': np.arange(0, 25, 1),
+    'gridsat': np.arange(0, 25, 1),
+}
 
-for name in names:
+for name in names[:-1]:
     mean_hist = hists[name].sum("time")
     ax.stairs(
         mean_hist["hist"] / mean_hist["size"],
-        np.arange(0, 25, 1),
+        bins[name],
         label=f"CCIC {name}",
         color=color[name],
         linewidth=2,
@@ -242,7 +259,7 @@ fig.savefig("plots/daily_cycle_change.png", dpi=300, bbox_inches="tight")
 fig, ax = plt.subplots(figsize=(8, 5))
 ax.axhline(0, color='k', linewidth=0.5)
 
-for name in names:
+for name in names[:-1]:
     mean_ccic = hists[name].sum("time")["hist"] / hists[name].sum("time")["size"]
     ax.plot(
         slopes[name]["local_time"],
@@ -267,5 +284,65 @@ ax.set_xlim([0, 23.9])
 ax.legend()
 fig.tight_layout()
 fig.savefig("plots/daily_cycle_change_all_regions.png", dpi=300, bbox_inches="tight")
+
+# %% plot change in diurnal cycle gridsat vs ccic
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.axhline(0, color='k', linewidth=0.5)
+
+for name in ['all', 'gridsat']:
+    mean_ccic = hists[name].sum("time")["hist"] / hists[name].sum("time")["size"]
+    ax.plot(
+        slopes[name]["local_time"],
+        slopes[name] * 100 / mean_ccic,
+        label=f"CCIC {name}",
+        color=color[name],
+        linewidth=2,
+    )
+
+    ax.fill_between(
+        slopes[name]["local_time"],
+        slopes[name] * 100 / mean_ccic - err[name] * 100 / mean_ccic,
+        slopes[name] * 100 / mean_ccic + err[name] * 100 / mean_ccic,
+        alpha=0.3,
+        color=color[name],
+    )
+
+ax.set_ylabel("dP(I $>$ 1 kg m$^{-2}$)/dT / % K$^{-1}$")
+ax.set_xlabel("Local Time / h")
+ax.spines[["top", "right"]].set_visible(False)
+ax.set_xlim([0, 23.9])
+ax.legend()
+fig.tight_layout()
+fig.savefig("plots/daily_cycle_change_gridsat.png", dpi=300, bbox_inches="tight")
+
+
+# %% plot mean daily cycle gridsat vs ccic
+fig, ax = plt.subplots(figsize=(8, 5))
+color = {'all': 'black', 'sea': 'blue', 'land': 'green', 'gridsat': 'red'}
+bins = {
+    'all': np.arange(0, 25, 1),
+    'sea': np.arange(0, 25, 1),
+    'land': np.arange(0, 25, 1),
+    'gridsat': np.arange(0, 25, 1),
+}
+
+for name in ['all', 'gridsat']:
+    mean_hist = hists[name].sum("time")
+    ax.stairs(
+        mean_hist["hist"] / mean_hist["size"],
+        bins[name],
+        label=f"CCIC {name}",
+        color=color[name],
+        linewidth=2,
+    )
+
+ax.set_ylabel("P($I$ > 1 kg m$^{-2}$)")
+ax.set_ylim([0.02, 0.075])
+ax.set_xlim([0, 23.9])
+ax.set_xlabel("Local Time / h")
+ax.spines[["top", "right"]].set_visible(False)
+ax.legend()
+fig.tight_layout()
+fig.savefig("plots/daily_cycle_mean_gridsat.png", dpi=300, bbox_inches="tight")
 
 # %%
