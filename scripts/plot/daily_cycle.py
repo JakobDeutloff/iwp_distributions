@@ -13,10 +13,18 @@ from scipy.stats import linregress
 
 # %%
 colors, line_labels, linestyles = definitions()
+color = {'all': 'black', 'sea': 'blue', 'land': 'green', 'gridsat': 'red', 'gpm': 'orange'}
+bins = {
+    'all': np.arange(0, 25, 1),
+    'sea': np.arange(0, 25, 1),
+    'land': np.arange(0, 25, 1),
+    'gridsat': np.arange(0, 27, 3),
+    'gpm': np.arange(0, 25, 1),
+}
 
 # %% open CCIC
 hists = {}
-names = ['all', 'sea', 'land', 'gridsat']
+names = ['all', 'sea', 'land', 'gridsat', 'gpm']
 hists['sea'] = read_ccic_dc("ccic_cpcir_daily_cycle_distribution_sea_")
 hists['all'] = read_ccic_dc("ccic_cpcir_daily_cycle_distribution_")
 hists['land'] = hists['all'] - hists['sea']
@@ -25,11 +33,16 @@ hists['land'] = hists['all'] - hists['sea']
 def process_gridsat(ds):
     ds = ds.sortby("time")
     return ds
-hist_gridsat = xr.open_mfdataset("/work/bm1183/m301049/gridsat/hourly/gridsat_2d_hist_*.nc", preprocess=process_gridsat).load()
+hist_gridsat = xr.open_mfdataset("/work/bm1183/m301049/gridsat/coarse/gridsat_2d_hist*.nc", preprocess=process_gridsat).load()
+
+# %% open gpm 
+hist_gpm = xr.open_mfdataset("/work/bm1183/m301049/GPM_MERGIR/hists/gpm_*.nc").load()
 
 # %%
 hists['gridsat'] = hist_gridsat.sel(bt=slice(None, 220)).sum('bt')
 hists['gridsat']['size'] = hists['gridsat']['hist'].sum('local_time')
+hists['gpm'] = hist_gpm.sel(bt=slice(None, 220)).sum('bt')
+hists['gpm']['size'] = hists['gpm']['hist'].sum('local_time')
 
 # %%
 mask = (
@@ -42,7 +55,7 @@ mask = (
 def resample_histograms(hist):
     hist_monthly = hist.resample(time="1ME").sum()
     hist_monthly["time"] = pd.to_datetime(hist_monthly["time"].dt.strftime("%Y-%m"))
-    hist_monthly = hist_monthly["hist"] / hist_monthly["size"]
+    hist_monthly = hist_monthly["hist"] / hist_monthly["size"].mean('time')
     hist_monthly = hist_monthly.transpose("local_time", "time")
     return hist_monthly
 
@@ -71,6 +84,7 @@ masks = {
     'sea': mask_trop,
     'land': ~mask_trop,
     'gridsat': True,
+    'gpm': True,
 }
 
 def get_montly_temp(mask):
@@ -189,15 +203,8 @@ fig.savefig("plots/daily_cycle_mean.png", dpi=300, bbox_inches="tight")
 
 # %% plot mean daily cycle all regions 
 fig, ax = plt.subplots(figsize=(8, 5))
-color = {'all': 'black', 'sea': 'blue', 'land': 'green', 'gridsat': 'red'}
-bins = {
-    'all': np.arange(0, 25, 1),
-    'sea': np.arange(0, 25, 1),
-    'land': np.arange(0, 25, 1),
-    'gridsat': np.arange(0, 25, 1),
-}
 
-for name in names[:-1]:
+for name in names[:-2]:
     mean_hist = hists[name].sum("time")
     ax.stairs(
         mean_hist["hist"] / mean_hist["size"],
@@ -288,12 +295,14 @@ fig.savefig("plots/daily_cycle_change_all_regions.png", dpi=300, bbox_inches="ti
 # %% plot change in diurnal cycle gridsat vs ccic
 fig, ax = plt.subplots(figsize=(8, 5))
 ax.axhline(0, color='k', linewidth=0.5)
+changes = {}
 
-for name in ['all', 'gridsat']:
+for name in ['all', 'gridsat', 'gpm']:
     mean_ccic = hists[name].sum("time")["hist"] / hists[name].sum("time")["size"]
+    changes[name] = slopes[name] * 100 / mean_ccic
     ax.plot(
         slopes[name]["local_time"],
-        slopes[name] * 100 / mean_ccic,
+        changes[name],
         label=f"CCIC {name}",
         color=color[name],
         linewidth=2,
@@ -311,6 +320,7 @@ ax.set_ylabel("dP(I $>$ 1 kg m$^{-2}$)/dT / % K$^{-1}$")
 ax.set_xlabel("Local Time / h")
 ax.spines[["top", "right"]].set_visible(False)
 ax.set_xlim([0, 23.9])
+ax.set_xticks([0, 6, 12, 18, 24])
 ax.legend()
 fig.tight_layout()
 fig.savefig("plots/daily_cycle_change_gridsat.png", dpi=300, bbox_inches="tight")
@@ -318,18 +328,19 @@ fig.savefig("plots/daily_cycle_change_gridsat.png", dpi=300, bbox_inches="tight"
 
 # %% plot mean daily cycle gridsat vs ccic
 fig, ax = plt.subplots(figsize=(8, 5))
-color = {'all': 'black', 'sea': 'blue', 'land': 'green', 'gridsat': 'red'}
+color = {'all': 'black', 'gridsat': 'red', 'gpm': 'orange'}
 bins = {
     'all': np.arange(0, 25, 1),
     'sea': np.arange(0, 25, 1),
     'land': np.arange(0, 25, 1),
-    'gridsat': np.arange(0, 25, 1),
+    'gridsat': np.arange(0, 27, 3),
+    'gpm': np.arange(0, 25, 1),
 }
 
-for name in ['all', 'gridsat']:
+for name in ['all', 'gridsat', 'gpm']:
     mean_hist = hists[name].sum("time")
     ax.stairs(
-        mean_hist["hist"] / mean_hist["size"],
+        mean_hist["hist"] / mean_hist["size"] / np.diff(bins[name]),
         bins[name],
         label=f"CCIC {name}",
         color=color[name],
@@ -345,4 +356,18 @@ ax.legend()
 fig.tight_layout()
 fig.savefig("plots/daily_cycle_mean_gridsat.png", dpi=300, bbox_inches="tight")
 
+# %%
+changes['+4K'] = change_icon['jed0022'] * 100 / hists_icon["jed0011"]
+changes['+2K'] = change_icon['jed0033'] * 100 / hists_icon["jed0011"]
+
+SW_in = xr.open_dataarray("/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc")
+SW_in = SW_in.interp(time_points=slopes['all']['local_time'], method='linear')
+weighted_ccic = (changes['all']* SW_in).sum() / SW_in.sum()
+print("CCIC weighted diurnal cycle change:", weighted_ccic.item())
+weighted_gpm = (changes['gpm'] * SW_in).sum() / SW_in.sum()
+print("GPM weighted diurnal cycle change:", weighted_gpm.item())
+weighted_4K = (changes['+4K'] * SW_in).sum() / SW_in.sum()
+print("ICON +4K weighted diurnal cycle change:", weighted_4K.item())
+weighted_2K = (changes['+2K'] * SW_in).sum() / SW_in.sum()
+print("ICON +2K weighted diurnal cycle change:", weighted_2K.item())
 # %%
