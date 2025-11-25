@@ -39,9 +39,9 @@ hist_gridsat = xr.open_mfdataset("/work/bm1183/m301049/gridsat/coarse/gridsat_2d
 hist_gpm = xr.open_mfdataset("/work/bm1183/m301049/GPM_MERGIR/hists/gpm_*.nc").load()
 
 # %%
-hists['gridsat'] = hist_gridsat.sel(bt=slice(None, 220)).sum('bt')
+hists['gridsat'] = hist_gridsat.sel(bt=slice(None, 240)).sum('bt')
 hists['gridsat']['size'] = hists['gridsat']['hist'].sum('local_time')
-hists['gpm'] = hist_gpm.sel(bt=slice(None, 220)).sum('bt')
+hists['gpm'] = hist_gpm.sel(bt=slice(None, 240)).sum('bt')
 hists['gpm']['size'] = hists['gpm']['hist'].sum('local_time')
 
 # %%
@@ -55,7 +55,7 @@ mask = (
 def resample_histograms(hist):
     hist_monthly = hist.resample(time="1ME").sum()
     hist_monthly["time"] = pd.to_datetime(hist_monthly["time"].dt.strftime("%Y-%m"))
-    hist_monthly = hist_monthly["hist"] / hist_monthly["size"].mean('time')
+    hist_monthly = hist_monthly["hist"] / hist_monthly["size"]
     hist_monthly = hist_monthly.transpose("local_time", "time")
     return hist_monthly
 
@@ -266,7 +266,7 @@ fig.savefig("plots/daily_cycle_change.png", dpi=300, bbox_inches="tight")
 fig, ax = plt.subplots(figsize=(8, 5))
 ax.axhline(0, color='k', linewidth=0.5)
 
-for name in names[:-1]:
+for name in names[:-2]:
     mean_ccic = hists[name].sum("time")["hist"] / hists[name].sum("time")["size"]
     ax.plot(
         slopes[name]["local_time"],
@@ -316,7 +316,16 @@ for name in ['all', 'gridsat', 'gpm']:
         color=color[name],
     )
 
-ax.set_ylabel("dP(I $>$ 1 kg m$^{-2}$)/dT / % K$^{-1}$")
+# plot ICON 
+ax.plot(
+    slopes['all']["local_time"],
+    change_icon['jed0022'] * 100 / hists_icon["jed0011"],
+    label=line_labels['jed0022'],
+    color=colors['jed0022'],
+)
+
+
+ax.set_ylabel("dP/dT / % K$^{-1}$")
 ax.set_xlabel("Local Time / h")
 ax.spines[["top", "right"]].set_visible(False)
 ax.set_xlim([0, 23.9])

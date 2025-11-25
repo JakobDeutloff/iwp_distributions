@@ -71,10 +71,6 @@ hists = xr.Dataset(
     },
 ).sortby("time")
 
-# %% control plot
-import matplotlib.pyplot as plt
-fig, ax = plt.subplots(figsize=(8, 4))
-hists.sel(bt=slice(None, 220)).sum('bt').mean('time')['hist'].plot(ax=ax)
 # %% save dataset
 out_path = "/work/bm1183/m301049/GPM_MERGIR/hists/"
 hists.to_netcdf(f"{out_path}/gpm_2d_hist_{year}.nc")
