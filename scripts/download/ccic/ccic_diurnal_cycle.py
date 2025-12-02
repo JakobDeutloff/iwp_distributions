@@ -10,7 +10,7 @@ from tqdm import tqdm
 import sys
 
 # %%
-year = sys.argv[1]
+year = '2008'#sys.argv[1]
 s3 = s3fs.S3FileSystem(anon=True)
 prefix = f"chalmerscloudiceclimatology/record/cpcir/{year}/ccic_cpcir_{year}*"
 files = s3.glob(prefix)
@@ -21,7 +21,7 @@ ds = xr.open_zarr(s3.get_mapper(files[0]))
 ds = ds.sel(latitude=slice(30, -30)).load()
 del(s3)
 
-mask_sea = mask.sel(lon=ds['longitude'], lat=ds['latitude'], method='nearest').drop_vars(['lon', 'lat'])
+mask = mask.sel(lon=ds['longitude'], lat=ds['latitude'], method='nearest').drop_vars(['lon', 'lat'])
 # %%
 local_dir = f"/work/bm1183/m301049/ccic_daily_cycle/{year}/"
 os.makedirs(local_dir, exist_ok=True)
@@ -48,21 +48,21 @@ def calc_2d_hist(file_path):
     )
 
     hist_1, _, _ = np.histogram2d(
-    ds['local_time'].isel(time=0).values.flatten(),
-    ds['tiwp'].isel(time=0).values.flatten(),
+    ds['local_time'].isel(time=0).where(mask).values.flatten(),
+    ds['tiwp'].isel(time=0).where(mask).values.flatten(),
     bins=[bins_lt, bins_iwp],
     density=False,
     )
-    size_1 = np.isfinite(ds['tiwp'].isel(time=0)).sum().item()
+    size_1 = np.isfinite(ds['tiwp'].isel(time=0).where(mask)).sum().item()
     time_1 = ds['time'].isel(time=0).values
 
     hist_2 , _, _ = np.histogram2d(
-    ds['local_time'].isel(time=1).values.flatten(),
-    ds['tiwp'].isel(time=1).values.flatten(),
+    ds['local_time'].isel(time=1).where(mask).values.flatten(),
+    ds['tiwp'].isel(time=1).where(mask).values.flatten(),
     bins=[bins_lt, bins_iwp],
     density=False,
     )
-    size_2 = np.isfinite(ds['tiwp'].isel(time=1)).sum().item()
+    size_2 = np.isfinite(ds['tiwp'].isel(time=1).where(mask)).sum().item()
     time_2 = ds['time'].isel(time=1).values
     return hist_1, hist_2, size_1, size_2, time_1, time_2
 
@@ -89,7 +89,7 @@ hists = xr.Dataset(
 ).sortby("time")
 
 # %% save dataset
-path = os.path.join(local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_{year}.nc")
+path = os.path.join(local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_sea_{year}.nc")
 hists.to_netcdf(path)
 
 # %%

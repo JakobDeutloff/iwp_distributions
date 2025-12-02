@@ -11,6 +11,13 @@ path = "/work/bm1183/m301049/GPM_MERGIR/"
 year = sys.argv[1]
 files = glob.glob(f"{path}/merg_{year}*.nc4")
 
+# %% load mask 
+mask = (
+    xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+    .load()
+)
+ds = xr.open_dataset(files[0], engine='netcdf4')
+mask = mask.sel(lon=ds.lon, lat=ds.lat, method='nearest')
 # %%
 bins_bt = np.arange(175, 330, 1)
 bins_lt = np.arange(0, 25, 1)
@@ -35,19 +42,19 @@ def calc_2d_hist(file_path):
         }
     )
     H_1, _, _ = np.histogram2d(
-        ds["local_time"].isel(time=0).values.flatten(),
-        ds["Tb"].isel(time=0).values.flatten(),
+        ds["local_time"].isel(time=0).where(mask).values.flatten(),
+        ds["Tb"].isel(time=0).where(mask).values.flatten(),
         bins=[bins_lt, bins_bt],
         density=False,
     )
-    size_1 = np.isfinite(ds["Tb"].isel(time=0)).sum().item()
+    size_1 = np.isfinite(ds["Tb"].isel(time=0).where(mask)).sum().item()
     H_2, _, _ = np.histogram2d(
-        ds["local_time"].isel(time=1).values.flatten(),
-        ds["Tb"].isel(time=1).values.flatten(),
+        ds["local_time"].isel(time=1).where(mask).values.flatten(),
+        ds["Tb"].isel(time=1).where(mask).values.flatten(),
         bins=[bins_lt, bins_bt],
         density=False,
     )
-    size_2 = np.isfinite(ds["Tb"].isel(time=1)).sum().item()
+    size_2 = np.isfinite(ds["Tb"].isel(time=1).where(mask)).sum().item()
     return H_1, H_2, size_1, size_2, ds['time'].values[0], ds['time'].values[1]
 
 # %%
@@ -73,4 +80,4 @@ hists = xr.Dataset(
 
 # %% save dataset
 out_path = "/work/bm1183/m301049/GPM_MERGIR/hists/"
-hists.to_netcdf(f"{out_path}/gpm_2d_hist_{year}.nc")
+hists.to_netcdf(f"{out_path}/gpm_2d_hist_{year}_sea.nc")

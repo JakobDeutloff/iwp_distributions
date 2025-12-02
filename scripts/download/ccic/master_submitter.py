@@ -2,7 +2,7 @@
 import os
 import numpy as np
 # %%
-years = ['2009', '2014', '2024']
+years = [str(year) for year in range(2000, 2025)]
 months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'] 
 # %%
 for year in years:

@@ -1,6 +1,8 @@
 import numpy as np
 import xarray as xr 
 from scipy.signal import detrend
+import pandas as pd
+from scipy.stats import linregress
 
 def nan_detrend_along_time(da):
     arr = da.values
@@ -76,3 +78,39 @@ def read_ccic_dc(filename):
 
     hists_ccic = xr.concat(hist_list, dim="time")
     return hists_ccic
+
+def resample_histograms(hist):
+    hist_monthly = hist.resample(time="1ME").sum()
+    hist_monthly["time"] = pd.to_datetime(hist_monthly["time"].dt.strftime("%Y-%m"))
+    hist_monthly = hist_monthly["hist"] / hist_monthly["hist"].sum("local_time")
+    hist_monthly = hist_monthly.transpose("local_time", "time")
+    return hist_monthly
+
+def deseason(ts):
+    ts_deseason = ts.groupby("time.month") - ts.groupby("time.month").mean(
+        "time"
+    )
+    ts_deseason["time"] = pd.to_datetime(ts_deseason["time"].dt.strftime("%Y-%m"))
+    return ts_deseason
+
+def regress_hist_temp_1d(hist, temp):
+    slopes = []
+    err = []
+    hist_dummy = hist.where(hist.notnull(), drop=True)
+    temp_vals = temp.sel(time=hist_dummy.time).values
+    for i in range(hist_dummy.local_time.size):
+        hist_vals = hist_dummy.isel(local_time=i).values
+        slope, intercept, r_value, p_value, std_err = linregress(temp_vals, hist_vals)
+        slopes.append(slope)
+        err.append(std_err)
+    slopes_da = xr.DataArray(
+        slopes,
+        coords={"local_time": hist_dummy.local_time},
+        dims=["local_time"],
+    )
+    err_da = xr.DataArray(
+        err,
+        coords={"local_time": hist_dummy.local_time},
+        dims=["local_time"],
+    )
+    return slopes_da, err_da
