@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def plot_regression(temp, hists, slopes, error, title):
@@ -122,3 +123,91 @@ def definitions():
 
 
     return colors, labels, linestyles
+
+def plot_2d_trend(mean_hist, slopes, p_values, dim):
+
+    fig, axes = plt.subplots(1, 3, figsize=(12, 6))
+
+    # Get mask of where p_value > 0.05
+    mask = p_values.values > 0.05
+    local_time_grid, dim_grid = np.meshgrid(
+        p_values.local_time.values, p_values[dim].values, indexing="ij"
+    )
+
+    # plot slopes
+    im_slope = axes[0].pcolor(
+        slopes.local_time,
+        slopes[dim],
+        slopes.T,
+        cmap="seismic",
+        vmin=-15,
+        vmax=15,
+    )
+    axes[0].scatter(
+        local_time_grid[mask],
+        dim_grid[mask],
+        color="black",
+        marker="o",
+        s=1,
+        label="p > 0.05",
+    )
+
+    # plot mean histogram
+    im_hist = axes[1].pcolor(
+        mean_hist.local_time, mean_hist[dim], mean_hist.T, cmap="binary", vmin=0, vmax=1
+    )
+
+    # plot weighted sensitivity
+    weighted = (slopes / 100) * mean_hist
+    im_weighted = axes[2].pcolor(
+        weighted.local_time,
+        weighted[dim],
+        weighted.T,
+        cmap="seismic",
+        vmin=-0.02,
+        vmax=0.02,
+    )
+    axes[2].scatter(
+        local_time_grid[mask],
+        dim_grid[mask],
+        color="black",
+        marker="o",
+        s=1,
+        label="p > 0.05",
+    )
+
+    if dim == "bt":
+        for ax in axes:
+            axes[0].set_ylabel("Brightness Temperature / K")
+            ax.set_xlabel("Local Time / h")
+
+    else:
+        for ax in axes:
+            ax.set_yscale("log")
+            ax.invert_yaxis()
+            ax.set_xlabel("Local Time / h")
+        axes[0].set_ylabel("$I$ / kg m$^{-2}$")
+
+    fig.colorbar(
+        im_slope,
+        ax=axes[0],
+        label="Sensitivity / % K$^{-1}$",
+        extend="both",
+        orientation="horizontal",
+    )
+    fig.colorbar(
+        im_hist,
+        ax=axes[1],
+        label="Normalised Histogram",
+        extend="neither",
+        orientation="horizontal",
+    )
+    fig.colorbar(
+        im_weighted,
+        ax=axes[2],
+        label="Weighted Sensitivity / K$^{-1}$",
+        extend="both",
+        orientation="horizontal",
+    )
+    fig.tight_layout()
+    return fig, axes

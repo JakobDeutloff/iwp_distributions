@@ -10,7 +10,7 @@ from tqdm import tqdm
 import sys
 
 # %%
-year = '2008'#sys.argv[1]
+year = sys.argv[1]
 s3 = s3fs.S3FileSystem(anon=True)
 prefix = f"chalmerscloudiceclimatology/record/cpcir/{year}/ccic_cpcir_{year}*"
 files = s3.glob(prefix)

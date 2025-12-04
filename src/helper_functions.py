@@ -83,7 +83,8 @@ def resample_histograms(hist):
     hist_monthly = hist.resample(time="1ME").sum()
     hist_monthly["time"] = pd.to_datetime(hist_monthly["time"].dt.strftime("%Y-%m"))
     hist_monthly = hist_monthly["hist"] / hist_monthly["hist"].sum("local_time")
-    hist_monthly = hist_monthly.transpose("local_time", "time")
+    if len(hist.dims) == 2:
+        hist_monthly = hist_monthly.transpose("local_time", "time")
     return hist_monthly
 
 def deseason(ts):
@@ -102,7 +103,7 @@ def regress_hist_temp_1d(hist, temp):
         hist_vals = hist_dummy.isel(local_time=i).values
         slope, intercept, r_value, p_value, std_err = linregress(temp_vals, hist_vals)
         slopes.append(slope)
-        err.append(std_err)
+        err.append(p_value)
     slopes_da = xr.DataArray(
         slopes,
         coords={"local_time": hist_dummy.local_time},
@@ -114,3 +115,83 @@ def regress_hist_temp_1d(hist, temp):
         dims=["local_time"],
     )
     return slopes_da, err_da
+
+def detrend_hist_2d(hist):
+
+    out = xr.zeros_like(hist)
+    if "bt" in hist.dims:
+        detrend_dim = "bt"
+    else:
+        detrend_dim = "iwp"
+    for i in hist[detrend_dim]:
+        hist_detrend = nan_detrend(hist.sel({detrend_dim: i}), dim="local_time")
+        out.loc[{detrend_dim: i}] = hist_detrend
+    return out
+
+def regress_hist_temp_2d(hist, temp):
+    if "bt" in hist.dims:
+        detrend_dim = "bt"
+    else:
+        detrend_dim = "iwp"
+
+    slopes = xr.zeros_like(hist.isel(time=0))
+    p_values = xr.zeros_like(hist.isel(time=0))
+    for i in hist.local_time:
+        for j in hist[detrend_dim]:
+            hist_vals = hist.sel({"local_time": i, detrend_dim: j})
+            hist_vals = hist_vals.where(np.isfinite(hist_vals), drop=True)
+            temp_vals = temp.sel(time=hist_vals.time)
+            slope, intercept, r_value, p_value, std_err = linregress(
+                temp_vals.values, hist_vals.values
+            )
+            slopes.loc[{"local_time": i, detrend_dim: j}] = slope
+            p_values.loc[{"local_time": i, detrend_dim: j}] = p_value
+    return slopes, p_values
+
+def lowpass_filter(da, cutoff_period_years=3):
+    """
+    Apply a lowpass filter using FFT to keep only periods longer than cutoff_period_years.
+
+    Parameters:
+    -----------
+    da : xarray.DataArray
+        Input data array with a 'time' dimension
+    cutoff_period_years : float
+        Cutoff period in years. Periods longer than this will be kept.
+
+    Returns:
+    --------
+    xarray.DataArray
+        Filtered data array
+    """
+    # Get time spacing (assuming monthly data)
+    time_diff = da.time.diff("time").dt.days.mean().values  # days
+    dt = time_diff / 365.25  # convert to years
+
+    # Get number of time steps and find time axis
+    n = len(da.time)
+    time_axis = da.dims.index("time")
+
+    # Compute FFT along time axis
+    fft_data = np.fft.fft(da.values, axis=time_axis)
+
+    # Get frequency array
+    freqs = np.fft.fftfreq(n, d=dt)  # frequencies in cycles per year
+
+    # Create filter: keep only frequencies corresponding to periods > cutoff_period_years
+    # Period = 1/frequency, so frequency < 1/cutoff_period_years
+    cutoff_freq = 1.0 / cutoff_period_years
+    filter_mask = np.abs(freqs) < cutoff_freq
+
+    # Apply filter in frequency domain by multiplying with the filter mask
+    # Reshape filter_mask to broadcast correctly along all dimensions
+    filter_shape = [1] * fft_data.ndim
+    filter_shape[time_axis] = n
+    filter_mask_broadcast = filter_mask.reshape(filter_shape)
+    fft_filtered = fft_data * filter_mask_broadcast
+
+    # Inverse FFT to get filtered time series
+    filtered_data = np.fft.ifft(fft_filtered, axis=time_axis).real
+
+    # Create output DataArray with same coordinates
+    return xr.DataArray(filtered_data, coords=da.coords, dims=da.dims)
