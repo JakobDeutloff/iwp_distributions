@@ -2,59 +2,78 @@
 import numpy as np
 import xarray as xr
 import numpy as np
-import sys
-from tqdm import tqdm
 import os
+from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
+import pandas as pd
 
 # %% load data
-run = sys.argv[1]
+run = 'jed0033'
 print(f"Processing run: {run}")
-followups = {"jed0011": "jed0111", "jed0022": "jed0222", "jed0033": "jed0333"}
 configs = {"jed0011": "icon-mpim", "jed0022": "icon-mpim-4K", "jed0033": "icon-mpim-2K"}
 names = {"jed0011": "control", "jed0022": "plus4K", "jed0033": "plus2K"}
 
 iwp = xr.open_dataset(
     f"/work/bm1183/m301049/icon_hcap_data/{names[run]}/production/{run}_iwp.nc"
 )
-iwp = iwp.rename_vars({'__xarray_dataarray_variable__':'iwp'})
+ds = iwp.rename_vars({'__xarray_dataarray_variable__':'iwp'})
 
+# %% define bins 
+bins_lt = np.arange(0, 25, 1)
+bins_iwp = bins_iwp = np.logspace(-3, 2, 254)
 
 # %% select timeslice from datasets 
-time_slices = np.arange(0, iwp.time.size, 24)
+days = np.unique(ds.time.dt.floor('D').values).astype(str)
+days = [day.split('T')[0] for day in days]
+def calc_2d_hist(day):
 
-hists = xr.DataArray(
-    np.zeros((len(time_slices) - 1, 24)),
-    dims=['day', "local_hour"],
+    ds_sel = ds.sel(time=day)
+
+    local_time = (
+    ds_sel["time"].dt.hour + (ds_sel["time"].dt.minute / 60) + (ds_sel["clon"] / 15)
+    ) % 24
+    ds_sel = ds_sel.assign(
+    {
+        "local_time": (
+            ('time', 'ncells'), local_time.data
+            ,
+        ),
+    })
+    hist, _, _ = np.histogram2d(
+    ds_sel["local_time"].values.flatten(),
+    ds_sel["iwp"].values.flatten(),
+    bins=[bins_lt, bins_iwp],
+    density=False,
+    )
+    size = np.isfinite(ds_sel["iwp"]).sum().item()
+    return hist, size
+
+# %%
+with ProcessPoolExecutor(max_workers=16) as executor:
+    results = list(tqdm(executor.map(calc_2d_hist, days), total=len(days)))
+
+hists, sizes = zip(*results)
+
+# %% construct dataset
+hists_xr = xr.Dataset(
+    {
+        "hist": (("time", "local_time", "iwp"), np.array(hists)),
+        "size": (("time"), np.array(sizes)),
+    },
     coords={
-        "day": np.arange(0, len(time_slices) - 1),
-        "local_hour": np.arange(0, 24)
-    }
-)
-for i in tqdm(range(0, len(time_slices) - 1)):
-    start = time_slices[i]
-    end = time_slices[i + 1]
-    sample = iwp.isel(time=slice(start, end))
-    #  calculate local_time
-    sample = sample.assign(
-        time_local=lambda d: d.time.dt.hour + (d.time.dt.minute / 60) + (d.clon / 15)
-    )
-    sample["time_local"] = (
-        sample["time_local"]
-        .where(sample["time_local"] < 24, sample["time_local"] - 24)
-        .where(sample["time_local"] > 0, sample["time_local"] + 24)
-    )
-    # calculate histogram
-    bins = np.arange(0, 25, 1)
-    hist, edges = np.histogram(
-        sample["time_local"].where(sample["iwp"] > 1),
-        bins=bins,
-        density=False,
-    )
-    hists[i, :] = hist
+        "local_time": 0.5 * (bins_lt[1:] + bins_lt[:-1]),
+        "iwp": 0.5 * (bins_iwp[1:] + bins_iwp[:-1]),
+        "time": pd.to_datetime(days),
+    },
+    attrs={
+        "description": "2D histogram of ICON IWP vs local time"
+    },
+).sortby("time")
 
 # %% save hists
-path = f"/work/bm1183/m301049/icon_hcap_data/{names[run]}/production/deep_clouds_daily_cycle_exact.nc"
+path = f"/work/bm1183/m301049/icon_hcap_data/{names[run]}/production/daily_cycle_hist_2d.nc"
 if os.path.exists(path):
     os.remove(path)
-hists.to_netcdf(path)
+hists_xr.to_netcdf(path)
 
+# %%

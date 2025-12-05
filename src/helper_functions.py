@@ -103,7 +103,7 @@ def regress_hist_temp_1d(hist, temp):
         hist_vals = hist_dummy.isel(local_time=i).values
         slope, intercept, r_value, p_value, std_err = linregress(temp_vals, hist_vals)
         slopes.append(slope)
-        err.append(p_value)
+        err.append(std_err)
     slopes_da = xr.DataArray(
         slopes,
         coords={"local_time": hist_dummy.local_time},
