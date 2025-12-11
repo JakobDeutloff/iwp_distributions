@@ -2,14 +2,11 @@
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import glob
 import re
-from dask.diagnostics import ProgressBar
 from src.helper_functions import nan_detrend, resample_histograms, deseason, regress_hist_temp_1d
 from src.plot import definitions
 from scipy.signal import detrend
-from scipy.stats import linregress
 
 # %%
 colors, line_labels, linestyles = definitions()
@@ -18,9 +15,11 @@ names = ["ccic", "gpm"]
 # %% open histograms
 hists = {}
 # ccic
-hist_ccic = xr.open_mfdataset(
-    "/work/bm1183/m301049/ccic_daily_cycle/*/ccic_cpcir_daily_cycle_distribution_2d_*.nc"
-).load()
+files = glob.glob(
+    "/work/bm1183/m301049/ccic_daily_cycle/*/ccic_cpcir_daily_cycle_distribution_2d*.nc"
+)
+files = [f for f in files if re.search(r"2d_\d{4}\.nc$", f)]
+hist_ccic = xr.open_mfdataset(files).load()
 
 # gpm
 hist_gpm = xr.open_mfdataset("/work/bm1183/m301049/GPM_MERGIR/hists/gpm_*.nc").load()
@@ -40,7 +39,7 @@ temp_trop = xr.open_dataset(
 
 # %%  detrend and deseasonalize
 temp_detrend = xr.DataArray(detrend(temp_trop), coords=temp_trop.coords, dims=temp_trop.dims)
-temp = deseason(temp_trop)
+temp = deseason(temp_detrend)
 for name in names:
     hist_detrend = nan_detrend(hists_monthly[name], dim="local_time")
     hists_monthly[name] = deseason(hist_detrend)
@@ -50,7 +49,7 @@ slopes = {}
 err = {}
 
 for name in names:
-    slopes[name], err[name] = regress_hist_temp_1d(hists_monthly[name], temp)
+    slopes[name], err[name] = regress_hist_temp_1d(hists_monthly[name], temp, hists[name])
 
 # %% load icon
 runs = ["jed0011", "jed0022", "jed0033"]
@@ -70,9 +69,9 @@ for run in runs:
     ].values
 
 
-change_icon = {}
 for run in runs[1:]:
-    change_icon[run] = (hists_icon[run] - hists_icon["jed0011"]) / temp_delta[run]
+    slopes[run] = (hists_icon[run] - hists_icon["jed0011"]) * 100 / temp_delta[run] / hists_icon["jed0011"]
+
 
 # %% plot of mean daily cycle
 fig, ax = plt.subplots(figsize=(8, 5))
@@ -111,14 +110,14 @@ for name in names:
     mean_hist = hists[name]['hist'].sum('time') / hists[name]['hist'].sum(['time', 'local_time'])
     ax.plot(
         mean_hist["local_time"],
-        slopes[name] * 100 / mean_hist,
+        slopes[name],
         label=f"{name}",
         color=color[name],
     )
     ax.fill_between(
         mean_hist["local_time"],
-        (slopes[name] - err[name]) * 100 / mean_hist,
-        (slopes[name] + err[name]) * 100 / mean_hist,
+        (slopes[name] - err[name]),
+        (slopes[name] + err[name]),
         color=color[name],
         alpha=0.3,
     )
@@ -126,7 +125,7 @@ for name in names:
 for run in runs[1:]:
     ax.plot(
         slopes['ccic']["local_time"],
-        change_icon[run] * 100 / hists_icon["jed0011"],
+        slopes[run],
         label=line_labels[run],
         color=colors[run],
     )
@@ -137,5 +136,35 @@ ax.set_xlim([0, 23.9])
 ax.legend()
 fig.tight_layout()
 fig.savefig("plots/diurnal_cycle/diurnal_cycle_change.png", dpi=300, bbox_inches="tight")
+
+# %% calculate 1d feedback
+SW_in = xr.open_dataarray(
+    "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
+)
+SW_in = SW_in.interp(time_points=slopes["ccic"]["local_time"], method="linear")
+area = {}
+area_chages = {}
+rad_changes = {}
+feedbacks = {}
+
+
+area['ccic'] = hists['ccic']['hist'].sum('time') / hists['ccic']['size'].sum()
+area['gpm'] = hists['gpm']['hist'].sum('time') / hists['gpm']['size'].sum()
+area['icon'] = hists_icon['jed0011']
+area_chages['ccic'] = (slopes['ccic']) * area['ccic']  # 1 / K
+area_chages['gpm'] = (slopes['gpm'] ) * area['gpm']  # 1 / K
+area_chages['icon'] = (change_icon['jed0022']) * area["icon"]
+rad_changes['ccic'] = (area_chages['ccic'] * SW_in * 0.6) - (
+    (area_chages['ccic']) * SW_in * 0.1
+)  # W / m^2 / K
+rad_changes['gpm'] = (area_chages['gpm'] * SW_in * 0.6) - (
+    (area_chages['gpm']) * SW_in * 0.1
+)  # W / m^2 / K
+rad_changes['icon'] = (area_chages['icon'] * SW_in * 0.6) - (
+    (area_chages['icon']) * SW_in * 0.1
+)  # W / m^2 / K
+for name in names + ["icon"]:
+    feedbacks[name] = rad_changes[name].sum()
+    print(f"{name.upper()} cloud feedback: {feedbacks[name].values:.2f} W/m2/K")
 
 # %%

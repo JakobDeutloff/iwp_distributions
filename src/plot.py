@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.colors as mcolors
 
 
 def plot_regression(temp, hists, slopes, error, title):
@@ -93,21 +94,21 @@ def definitions():
         "jed0022": "#c1df24",
         "jed0033": "#1f948a",
         "rcemip": "#ff7f0e",
-        'dardar': 'brown',
-        '2c': 'k', 
-        'ccic': 'purple',
-        'spare': 'darkgreen'
+        "dardar": "brown",
+        "2c": "k",
+        "ccic": "purple",
+        "spare": "darkgreen",
     }
 
     labels = {
-        'jed0011': 'ICON Control', 
-        'jed0022': 'ICON +4 K',
-        'jed0033': 'ICON +2 K',
-        'rcemip': 'RCEMIP',
-        'dardar': 'DARDAR',
-        '2c': '2C-ICE',
-        'ccic': 'CCIC',
-        'spare': 'SPARE-ICE',
+        "jed0011": "ICON Control",
+        "jed0022": "ICON +4 K",
+        "jed0033": "ICON +2 K",
+        "rcemip": "RCEMIP",
+        "dardar": "DARDAR",
+        "2c": "2C-ICE",
+        "ccic": "CCIC",
+        "spare": "SPARE-ICE",
     }
 
     linestyles = {
@@ -115,18 +116,31 @@ def definitions():
         "jed0022": "--",
         "jed0033": "--",
         "rcemip": "--",
-        'dardar': '-',
-        '2c': '-',
-        'ccic': '-',
-        'spare': '-',
+        "dardar": "-",
+        "2c": "-",
+        "ccic": "-",
+        "spare": "-",
     }
-
 
     return colors, labels, linestyles
 
-def plot_2d_trend(mean_hist, slopes, p_values, dim):
 
-    fig, axes = plt.subplots(1, 3, figsize=(12, 6))
+def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
+
+    fig, axes = plt.subplots(1, 4, figsize=(10, 4), sharey=True)
+
+    # create colormaps
+    # Create a diverging colormap: blue -> white -> red
+    colors = ["#0E23E3", "white", "#FF0000"]
+    n_bins = 256
+    cmap_change = mcolors.LinearSegmentedColormap.from_list(
+        "custom_diverging", colors, N=n_bins
+    )
+
+    colors = ["#0EC7E3", "white", "#FB06BA"]
+    cmap_feedback = mcolors.LinearSegmentedColormap.from_list(
+        "custom_diverging_feedback", colors, N=n_bins
+    )
 
     # Get mask of where p_value > 0.05
     mask = p_values.values > 0.05
@@ -139,75 +153,119 @@ def plot_2d_trend(mean_hist, slopes, p_values, dim):
         slopes.local_time,
         slopes[dim],
         slopes.T,
-        cmap="seismic",
-        vmin=-15,
-        vmax=15,
+        cmap=cmap_change,
+        vmin=-7,
+        vmax=7,
+        rasterized=True,
     )
     axes[0].scatter(
         local_time_grid[mask],
         dim_grid[mask],
         color="black",
         marker="o",
-        s=1,
+        s=0.5,
         label="p > 0.05",
     )
 
-    # plot mean histogram
+    # plot area fraction
     im_hist = axes[1].pcolor(
-        mean_hist.local_time, mean_hist[dim], mean_hist.T, cmap="binary", vmin=0, vmax=1
+        area_fraction.local_time,
+        area_fraction[dim],
+        area_fraction.T,
+        cmap="binary",
+        vmin=0,
+        vmax=0.0005,
+        rasterized=True,
     )
 
-    # plot weighted sensitivity
-    weighted = (slopes / 100) * mean_hist
+    # plot area change
     im_weighted = axes[2].pcolor(
-        weighted.local_time,
-        weighted[dim],
-        weighted.T,
-        cmap="seismic",
-        vmin=-0.02,
-        vmax=0.02,
+        area_change.local_time,
+        area_change[dim],
+        area_change.T,
+        cmap=cmap_change,
+        vmin=-7e-6,
+        vmax=7e-6,
+        rasterized=True,
     )
     axes[2].scatter(
         local_time_grid[mask],
         dim_grid[mask],
         color="black",
         marker="o",
-        s=1,
+        s=0.5,
+        label="p > 0.05",
+    )
+
+    # plot feedback
+    im_feedback = axes[3].pcolor(
+        feedback.local_time,
+        feedback[dim],
+        feedback.T,
+        cmap=cmap_feedback,
+        vmin=-0.006,
+        vmax=0.006,
+        rasterized=True,
+    )
+    axes[3].scatter(
+        local_time_grid[mask & (local_time_grid >=6) & (local_time_grid <=18)],
+        dim_grid[mask & (local_time_grid >=6) & (local_time_grid <=18)],
+        color="black",
+        marker="o",
+        s=0.5,
         label="p > 0.05",
     )
 
     if dim == "bt":
         for ax in axes:
-            axes[0].set_ylabel("Brightness Temperature / K")
             ax.set_xlabel("Local Time / h")
-
+            ax.set_ylim([200, 260])
+            ax.set_yticks([200, 230, 260])
+        axes[0].set_ylabel("Brightness Temperature / K")
     else:
         for ax in axes:
             ax.set_yscale("log")
             ax.invert_yaxis()
-            ax.set_xlabel("Local Time / h")
+            ax.set_ylim([10, 1e-1])
         axes[0].set_ylabel("$I$ / kg m$^{-2}$")
 
-    fig.colorbar(
+    for ax in axes:
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.set_xticks([6, 12, 18])
+        ax.set_xlabel("Local Time / h")
+
+    cb1 = fig.colorbar(
         im_slope,
         ax=axes[0],
-        label="Sensitivity / % K$^{-1}$",
+        label=" d$f$/d$T$ / % K$^{-1}$",
         extend="both",
         orientation="horizontal",
     )
-    fig.colorbar(
+    cb1.set_ticks([-7, 0, 7])
+    cb2 = fig.colorbar(
         im_hist,
         ax=axes[1],
-        label="Normalised Histogram",
+        label="$f$",
         extend="neither",
         orientation="horizontal",
     )
-    fig.colorbar(
+    cb2.set_ticks([0, 0.00025, 0.0005])
+    cb3 = fig.colorbar(
         im_weighted,
         ax=axes[2],
-        label="Weighted Sensitivity / K$^{-1}$",
+        label="d$f$/d$T$ / K$^{-1}$",
         extend="both",
         orientation="horizontal",
     )
+    cb3.set_ticks([-7e-6, 0, 7e-6])
+    cb4 = fig.colorbar(
+        im_feedback,
+        ax=axes[3],
+        label="$\lambda$ / W m$^{-2}$ K$^{-1}$",
+        extend="both",
+        orientation="horizontal",
+    )
+    cb4.set_ticks([-0.006, 0, 0.006])
+
     fig.tight_layout()
     return fig, axes

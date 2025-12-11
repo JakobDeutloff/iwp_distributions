@@ -87,6 +87,13 @@ def resample_histograms(hist):
         hist_monthly = hist_monthly.transpose("local_time", "time")
     return hist_monthly
 
+def normalise_histograms(hist):
+    hist = hist["hist"] / hist["hist"].sum("local_time")
+    if len(hist.dims) == 2:
+        hist = hist.transpose("local_time", "time")
+    return hist
+
+
 def deseason(ts):
     ts_deseason = ts.groupby("time.month") - ts.groupby("time.month").mean(
         "time"
@@ -94,10 +101,10 @@ def deseason(ts):
     ts_deseason["time"] = pd.to_datetime(ts_deseason["time"].dt.strftime("%Y-%m"))
     return ts_deseason
 
-def regress_hist_temp_1d(hist, temp):
+def regress_hist_temp_1d(hist_detrend, temp, hist):
     slopes = []
     err = []
-    hist_dummy = hist.where(hist.notnull(), drop=True)
+    hist_dummy = hist_detrend.where(hist_detrend.notnull(), drop=True)
     temp_vals = temp.sel(time=hist_dummy.time).values
     for i in range(hist_dummy.local_time.size):
         hist_vals = hist_dummy.isel(local_time=i).values
@@ -114,7 +121,10 @@ def regress_hist_temp_1d(hist, temp):
         coords={"local_time": hist_dummy.local_time},
         dims=["local_time"],
     )
-    return slopes_da, err_da
+    mean_hist = hist['hist'].sum('time') / hist['hist'].sum(['time', 'local_time'])
+    slopes_perc = slopes_da * 100 / mean_hist
+    err_perc = err_da * 100 / mean_hist
+    return slopes_perc, err_perc
 
 def detrend_hist_2d(hist):
 
@@ -128,17 +138,17 @@ def detrend_hist_2d(hist):
         out.loc[{detrend_dim: i}] = hist_detrend
     return out
 
-def regress_hist_temp_2d(hist, temp):
-    if "bt" in hist.dims:
+def regress_hist_temp_2d(hist_detrend, temp, hist):
+    if "bt" in hist_detrend.dims:
         detrend_dim = "bt"
     else:
         detrend_dim = "iwp"
 
-    slopes = xr.zeros_like(hist.isel(time=0))
-    p_values = xr.zeros_like(hist.isel(time=0))
-    for i in hist.local_time:
-        for j in hist[detrend_dim]:
-            hist_vals = hist.sel({"local_time": i, detrend_dim: j})
+    slopes = xr.zeros_like(hist_detrend.isel(time=0))
+    p_values = xr.zeros_like(hist_detrend.isel(time=0))
+    for i in hist_detrend.local_time:
+        for j in hist_detrend[detrend_dim]:
+            hist_vals = hist_detrend.sel({"local_time": i, detrend_dim: j})
             hist_vals = hist_vals.where(np.isfinite(hist_vals), drop=True)
             temp_vals = temp.sel(time=hist_vals.time)
             slope, intercept, r_value, p_value, std_err = linregress(
@@ -146,7 +156,10 @@ def regress_hist_temp_2d(hist, temp):
             )
             slopes.loc[{"local_time": i, detrend_dim: j}] = slope
             p_values.loc[{"local_time": i, detrend_dim: j}] = p_value
-    return slopes, p_values
+
+    mean_hist = hist.mean('time')
+    slopes_perc = slopes * 100 / mean_hist
+    return slopes_perc, p_values
 
 def lowpass_filter(da, cutoff_period_years=3):
     """
