@@ -125,9 +125,9 @@ def definitions():
     return colors, labels, linestyles
 
 
-def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
+def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedback_cum, err_cum, dim):
 
-    fig, axes = plt.subplots(1, 4, figsize=(10, 4), sharey=True)
+    fig, axes = plt.subplots(2, 5, figsize=(12, 4), sharey='row', height_ratios=[1, 0.05], width_ratios=[2, 2, 2, 2, 1])
 
     # create colormaps
     # Create a diverging colormap: blue -> white -> red
@@ -149,7 +149,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     )
 
     # plot slopes
-    im_slope = axes[0].pcolor(
+    im_slope = axes[0, 0].pcolor(
         slopes.local_time,
         slopes[dim],
         slopes.T,
@@ -158,7 +158,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
         vmax=7,
         rasterized=True,
     )
-    axes[0].scatter(
+    axes[0, 0].scatter(
         local_time_grid[mask],
         dim_grid[mask],
         color="black",
@@ -168,7 +168,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     )
 
     # plot area fraction
-    im_hist = axes[1].pcolor(
+    im_hist = axes[0, 1].pcolor(
         area_fraction.local_time,
         area_fraction[dim],
         area_fraction.T,
@@ -179,7 +179,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     )
 
     # plot area change
-    im_weighted = axes[2].pcolor(
+    im_weighted = axes[0, 2].pcolor(
         area_change.local_time,
         area_change[dim],
         area_change.T,
@@ -188,7 +188,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
         vmax=7e-6,
         rasterized=True,
     )
-    axes[2].scatter(
+    axes[0, 2].scatter(
         local_time_grid[mask],
         dim_grid[mask],
         color="black",
@@ -198,7 +198,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     )
 
     # plot feedback
-    im_feedback = axes[3].pcolor(
+    im_feedback = axes[0, 3].pcolor(
         feedback.local_time,
         feedback[dim],
         feedback.T,
@@ -207,7 +207,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
         vmax=0.006,
         rasterized=True,
     )
-    axes[3].scatter(
+    axes[0, 3].scatter(
         local_time_grid[mask & (local_time_grid >=6) & (local_time_grid <=18)],
         dim_grid[mask & (local_time_grid >=6) & (local_time_grid <=18)],
         color="black",
@@ -216,27 +216,45 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
         label="p > 0.05",
     )
 
+    # plot cumsum of feedback
+    axes[0, 4].plot(
+        feedback_cum,
+        feedback_cum[dim],
+        color="k",
+        label="Cumulative Feedback",
+    )
+    axes[0, 4].fill_betweenx(
+        feedback_cum[dim],
+        feedback_cum - err_cum,
+        feedback_cum + err_cum,
+        color="gray",
+        alpha=0.5,
+    )
+    axes[0, 4].spines[["top", "right"]].set_visible(False)
+    axes[0, 4].set_xlabel(" $\sum$ $\lambda$ / W m$^{-2}$ K")
+    axes[0, 4].set_xticks([0, np.round(feedback_cum.isel({dim:-1}).values, 2)])
+
     if dim == "bt":
-        for ax in axes:
+        for ax in axes[0,:-1]:
             ax.set_xlabel("Local Time / h")
             ax.set_ylim([200, 260])
             ax.set_yticks([200, 230, 260])
-        axes[0].set_ylabel("Brightness Temperature / K")
+        axes[0, 0].set_ylabel("Brightness Temperature / K")
     else:
-        for ax in axes:
+        for ax in axes[0,:-1]:
             ax.set_yscale("log")
             ax.invert_yaxis()
             ax.set_ylim([10, 1e-1])
-        axes[0].set_ylabel("$I$ / kg m$^{-2}$")
+        axes[0, 0].set_ylabel("$I$ / kg m$^{-2}$")
 
-    for ax in axes:
+    for ax in axes[0, :-1]:
         ax.spines[["top", "right"]].set_visible(False)
         ax.set_xticks([6, 12, 18])
         ax.set_xlabel("Local Time / h")
 
     cb1 = fig.colorbar(
         im_slope,
-        ax=axes[0],
+        cax=axes[1, 0],
         label=" d$f$/d$T$ / % K$^{-1}$",
         extend="both",
         orientation="horizontal",
@@ -244,7 +262,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     cb1.set_ticks([-7, 0, 7])
     cb2 = fig.colorbar(
         im_hist,
-        ax=axes[1],
+        cax=axes[1, 1],
         label="$f$",
         extend="neither",
         orientation="horizontal",
@@ -252,7 +270,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     cb2.set_ticks([0, 0.00025, 0.0005])
     cb3 = fig.colorbar(
         im_weighted,
-        ax=axes[2],
+        cax=axes[1, 2],
         label="d$f$/d$T$ / K$^{-1}$",
         extend="both",
         orientation="horizontal",
@@ -260,12 +278,13 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, dim):
     cb3.set_ticks([-7e-6, 0, 7e-6])
     cb4 = fig.colorbar(
         im_feedback,
-        ax=axes[3],
+        cax=axes[1, 3],
         label="$\lambda$ / W m$^{-2}$ K$^{-1}$",
         extend="both",
         orientation="horizontal",
     )
     cb4.set_ticks([-0.006, 0, 0.006])
+    axes[1, 4].remove()
 
     fig.tight_layout()
     return fig, axes
