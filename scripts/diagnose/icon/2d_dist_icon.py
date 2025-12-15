@@ -8,7 +8,7 @@ from tqdm import tqdm
 import pandas as pd
 
 # %% load data
-run = 'jed0033'
+run = 'jed0022'
 print(f"Processing run: {run}")
 configs = {"jed0011": "icon-mpim", "jed0022": "icon-mpim-4K", "jed0033": "icon-mpim-2K"}
 names = {"jed0011": "control", "jed0022": "plus4K", "jed0033": "plus2K"}
@@ -19,7 +19,7 @@ iwp = xr.open_dataset(
 ds = iwp.rename_vars({'__xarray_dataarray_variable__':'iwp'})
 
 # %% define bins 
-bins_lt = np.arange(0, 25, 1)
+bins_lt = np.arange(0, 24.1, 0.1)
 bins_iwp = bins_iwp = np.logspace(-3, 2, 254)
 
 # %% select timeslice from datasets 
@@ -71,7 +71,7 @@ hists_xr = xr.Dataset(
 ).sortby("time")
 
 # %% save hists
-path = f"/work/bm1183/m301049/icon_hcap_data/{names[run]}/production/daily_cycle_hist_2d.nc"
+path = f"/work/bm1183/m301049/icon_hcap_data/{names[run]}/production/daily_cycle_hist_2d_highres.nc"
 if os.path.exists(path):
     os.remove(path)
 hists_xr.to_netcdf(path)

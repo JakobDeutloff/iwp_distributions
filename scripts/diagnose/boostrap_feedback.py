@@ -35,8 +35,12 @@ SW_in = xr.open_dataarray(
     "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
 )
 SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")
-albedo = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo.nc')['hc_albedo']
-
+albedo_iwp = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc')['hc_albedo']
+albedo_bt = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc')['hc_albedo']
+albedo = {
+    "ccic": albedo_iwp,
+    "gpm": albedo_bt,
+}
 # %% load era5 surface temp
 temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics_sea.nc").t2m
 
@@ -81,7 +85,7 @@ def calc_feedback_bs(seed, name='ccic', len_block=70):
     )  # 1/1
     area_change_bs = (slope_bs / 100) * area_fraction_bs  # 1/K
     feedback_2d_bs = -1 * (
-        (area_change_bs * SW_in * albedo) - ((area_change_bs) * SW_in * 0.1)
+        (area_change_bs * SW_in * albedo[name]) - ((area_change_bs) * SW_in * 0.1)
     )  # W / m^2 / K
     return feedback_2d_bs
 
@@ -105,17 +109,21 @@ feedbacks_gpm = xr.concat(results, dim="iteration")
 feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc")
 
 # %% test bootstrapping 
-n_iterations = [10, 30, 70, 100, 200, 300, 500, 750, 1000, 1500, 2000]
+n_iterations = [15, 31, 62, 125, 250, 500, 1000]
+n_repeats = 5
 feedbacks_bs = {}
 for n in n_iterations:
     print(f"Calculating bootstrap feedbacks for {n} iterations")
-    with ProcessPoolExecutor(max_workers=128) as executor:
-        results = list(
-            tqdm(executor.map(calc_feedback_bs, range(n), ['ccic'] * n), total=n)
-        )
-    #  put the results into an xarray
-    feedbacks = xr.concat(results, dim="iteration")
-    feedbacks_bs[n] = feedbacks
+    for j in range(n_repeats):
+        feedbacks = []
+        with ProcessPoolExecutor(max_workers=128) as executor:
+            results = list(
+                tqdm(executor.map(calc_feedback_bs, range(n), ['ccic'] * n), total=n)
+            )
+        #  put the results into an xarray
+        feedbacks = feedbacks.extend(xr.concat(results, dim="iteration"))
+    feedbacks_bs[n] = xr.concat(feedbacks, dim="repeat_iteration")
+        
 
 mean_feedbacks = []
 std_feedbacks = []
@@ -128,12 +136,19 @@ for n in n_iterations:
     )
 
 # %%
-fig, axes = plt.subplots(2, 1, figsize=(6,4), sharex=True)
-axes[0].plot(n_iterations, mean_feedbacks, 'o-', color='k')
-axes[1].plot(n_iterations, std_feedbacks, 'o-', color='k')
+fig, axes = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
+axes[0].plot(n_iterations, mean_feedbacks, marker='o', linestyle='', color='k')
+axes[1].plot(n_iterations, std_feedbacks, marker='o', linestyle='', color='k')
 axes[1].set_xlabel("Number of bootstrap iterations")
-axes[0].set_ylabel("Mean Feedback / W m$^{-2}$ K$^{-1}$")
-axes[1].set_ylabel("Std Feedback / W m$^{-2}$ K$^{-1}$")
+axes[0].set_ylabel("$\lambda$ / W m$^{-2}$ K$^{-1}$")
+axes[1].set_ylabel("$\sigma (\lambda)$ / W m$^{-2}$ K$^{-1}$")
 for ax in axes:
     ax.spines[["top", "right"]].set_visible(False)
+
+    ax.set_xscale('log')
+    ax.set_xticks(n_iterations)
+    ax.set_xticklabels(n_iterations, rotation=45)
 fig.tight_layout()
+fig.savefig('plots/diurnal_cycle/bootstrap_convergence_ccic.pdf')
+
+# %%
