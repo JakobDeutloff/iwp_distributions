@@ -172,7 +172,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
         area_fraction.local_time,
         area_fraction[dim],
         area_fraction.T,
-        cmap="binary",
+        cmap="binary_r",
         vmin=0,
         vmax=0.0005,
         rasterized=True,
@@ -255,7 +255,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
     cb1 = fig.colorbar(
         im_slope,
         cax=axes[1, 0],
-        label=" d$f$/d$T$ / % K$^{-1}$",
+        label=r"$\dfrac{\mathrm{d}f}{f~\mathrm{d}T}$ / % K$^{-1}$",
         extend="both",
         orientation="horizontal",
     )
@@ -264,14 +264,14 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
         im_hist,
         cax=axes[1, 1],
         label="$f$",
-        extend="neither",
+        extend="max",
         orientation="horizontal",
     )
     cb2.set_ticks([0, 0.00025, 0.0005])
     cb3 = fig.colorbar(
         im_weighted,
         cax=axes[1, 2],
-        label="d$f$/d$T$ / K$^{-1}$",
+        label=r"$\dfrac{\mathrm{d}f}{\mathrm{d}T}$ / K$^{-1}$",
         extend="both",
         orientation="horizontal",
     )

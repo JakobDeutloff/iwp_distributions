@@ -6,6 +6,7 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
+
 import xarray as xr
 from src.helper_functions import (
     normalise_histograms,
@@ -65,12 +66,12 @@ for name in names:
     hists_detrend[name] = deseason(hists_detrend[name])
 
 # %%
-def calc_feedback_bs(seed, name='ccic', len_block=70):
+def calc_feedback_bs(name='ccic', len_block=70):
 
     n_sample = hists_detrend[name].time.size
     n_blocks = int(hists_monthly[name].time.size / len_block)
     max_idx_block = n_sample-len_block
-    np.random.seed(seed)
+    np.random.seed()
     block_idxs = np.random.randint(0, max_idx_block, n_blocks)
     time_idx = []
 
@@ -96,23 +97,43 @@ def calc_feedback_bs(seed, name='ccic', len_block=70):
     )  # W / m^2 / K
     return feedback_2d_bs
 
-# %% calc feedback ccic
-n_iterations = 2000
-with ProcessPoolExecutor(max_workers=128) as executor:
-    results = list(
-        tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['ccic'] * n_iterations), total=n_iterations)
-    )
-#  put the results into an xarray
-feedbacks = xr.concat(results, dim="iteration")
-feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d.nc")
+# %% test bootstrapping for different number of samples
+n_iterations = [16, 31, 60, 125, 250, 500, 1000]
+n_repeats = 5
+feedbacks_bs = {}
+for n in n_iterations:
+    print(f"Calculating bootstrap feedbacks for {n} iterations")
+    feedbacks = [None] * n_repeats
+    for j in range(n_repeats):
+        with ProcessPoolExecutor(max_workers=128) as executor:
+            results = list(
+                tqdm(executor.map(calc_feedback_bs, ['ccic'] * n), total=n)
+            )
+        #  put the results into an xarray
+        feedbacks[j] = xr.concat(results, dim="iteration")
+    feedbacks_bs[n] = xr.concat(feedbacks, dim="repeat_iteration")
 
-# %% calc feedback gpm
-with ProcessPoolExecutor(max_workers=128) as executor:
-    results = list(
-        tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['gpm'] * n_iterations), total=n_iterations)
-    )
-#  put the results into an xarray
-feedbacks_gpm = xr.concat(results, dim="iteration")
-feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc")
+ # %%  save results
+import pickle
+with open("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d_sample_size_test.pkl", "wb") as f:
+    pickle.dump(feedbacks_bs, f)
 
-# %%
+# %% test bootstrapping for different window lengths
+windows = [10, 30, 50, 70, 90, 120]
+n_repeats = 5
+feedbacks_bs_window = {}
+for w in windows:
+    print(f"Calculating bootstrap feedbacks for window length {w} ")
+    feedbacks = [None] * n_repeats
+    for j in range(n_repeats):
+        with ProcessPoolExecutor(max_workers=128) as executor:
+            results = list(
+                tqdm(executor.map(calc_feedback_bs, ['ccic'] * 1000, [w] * 1000), total=1000)
+            )
+        #  put the results into an xarray
+        feedbacks[j] = xr.concat(results, dim="iteration")
+    feedbacks_bs_window[w] = xr.concat(feedbacks, dim="repeat_iteration")
+
+ # %%  save results
+with open("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d_length_test.pkl", "wb") as f:
+    pickle.dump(feedbacks_bs_window, f)

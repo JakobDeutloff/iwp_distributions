@@ -145,7 +145,7 @@ def plot_change_diurnal_cycle(slopes, err):
     
     ax.set_xlim([0, 24])
     ax.set_xlabel("Local Time / h")
-    ax.set_ylabel("d$f$/d$T$ / % K$^{-1}$")
+    ax.set_ylabel(r"$\dfrac{\mathrm{d}f}{f~\mathrm{d}T}$ / % K$^{-1}$")
     ax.legend()
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks([6, 12, 18])
@@ -237,7 +237,7 @@ for ax in axes:
     ax.set_xticks([6, 12, 18])
     ax.set_yticks([-4, 0, 4])
 
-axes[0].set_ylabel("d$f$/d$T$ / % K$^{-1}$")
+axes[0].set_ylabel(r"$\dfrac{\mathrm{d}f}{f~\mathrm{d}T}$ / % K$^{-1}$")
 fig.tight_layout()
 
 fig.savefig("plots/diurnal_cycle/diurnal_cycle_change_land_sea_paper.pdf")
