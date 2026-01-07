@@ -89,7 +89,7 @@ hists = xr.Dataset(
 ).sortby("time")
 
 # %% save dataset
-path = os.path.join(local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_sea_{year}.nc")
+path = os.path.join(local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_sea_500_{year}.nc")
 hists.to_netcdf(path)
 
 # %%

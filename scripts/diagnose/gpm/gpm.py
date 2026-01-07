@@ -66,7 +66,7 @@ hists_1, hists_2, sizes_1, sizes_2, times_1, times_2 = zip(*results)
 hists = xr.Dataset(
     {
         "hist": (("time", "local_time", "bt"), np.array(hists_1 + hists_2)),
-        "size": (("time"), np.array(sizes_1 + sizes_2)),
+        "size": (("time", "local_time"), np.array(sizes_1 + sizes_2)),
     },
     coords={
         "local_time": 0.5 * (bins_lt[1:] + bins_lt[:-1]),
@@ -80,4 +80,4 @@ hists = xr.Dataset(
 
 # %% save dataset
 out_path = "/work/bm1183/m301049/GPM_MERGIR/hists_sea/"
-hists.to_netcdf(f"{out_path}/gpm_2d_hist_{year}_sea.nc")
+hists.to_netcdf(f"{out_path}/gpm_2d_hist_{year}_strat_sea.nc")

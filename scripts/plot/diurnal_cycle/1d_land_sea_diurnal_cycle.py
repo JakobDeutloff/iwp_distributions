@@ -102,8 +102,7 @@ def plot_mean_histograms(hists):
     fig, ax = plt.subplots(figsize=(5, 3.5))
     mean_hists = {}
     for name in names:
-        mean_hists[name] = hists[name]["hist"].sum("time") / hists[name]["size"].sum(
-        )
+        mean_hists[name] = hists[name]["hist"].sum("time") / (hists[name]["size"].sum() / 24)
         ax.plot(
             mean_hists[name].local_time,
             mean_hists[name],
@@ -118,7 +117,6 @@ def plot_mean_histograms(hists):
     ax.legend()
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks([6, 12, 18])
-    ax.set_yticks([0.001, 0.002, 0.003])
     fig.tight_layout()
 
     return fig
