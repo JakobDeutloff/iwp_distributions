@@ -14,6 +14,7 @@ from scipy.signal import detrend
 # %% load ccic data
 color = {"all": "black", "sea": "blue", "land": "green"}
 names = ["all", "sea", "land"]
+dims = {'ccic': 'iwp', 'gpm': 'bt'}
 hists_ccic = {}
 hists_gpm = {}
 for name in names:
@@ -23,12 +24,16 @@ for name in names:
     hists_gpm[name] = xr.open_dataset(
         f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_{name}.nc"  
     )
-# %% integrate hists 
+# calculate size as function of local time
+for name in names:
+    hists_ccic[name]["size"] = hists_ccic[name]["hist"].sum(dims['ccic'])
+    hists_gpm[name]["size"] = hists_gpm[name]["hist"].sum(dims['gpm'])
+#  integrate hists 
 for name in names:
     hists_ccic[name] = hists_ccic[name].sel(iwp=slice(1, None)).sum("iwp")
-    hists_gpm[name] = hists_gpm[name].sel(bt=slice(None, 237)).sum("bt")
+    hists_gpm[name] = hists_gpm[name].sel(bt=slice(None, 231)).sum("bt")
 
-# %% resample histograms to monthly
+# %% normalise histograms
 hists_ccic_monthly = {}
 hists_gpm_monthly = {}
 for name in names:
@@ -98,11 +103,12 @@ for run in runs[1:]:
 
 
 # %% plot mean histograms 
+dims = {'ccic': 'iwp', 'gpm': 'bt'}
 def plot_mean_histograms(hists):
     fig, ax = plt.subplots(figsize=(5, 3.5))
     mean_hists = {}
     for name in names:
-        mean_hists[name] = hists[name]["hist"].sum("time") / (hists[name]["size"].sum() / 24)
+        mean_hists[name] = hists[name]["hist"].sum("time") / (hists[name]['size'].sum('time'))
         ax.plot(
             mean_hists[name].local_time,
             mean_hists[name],

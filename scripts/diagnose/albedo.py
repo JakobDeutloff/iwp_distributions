@@ -26,6 +26,16 @@ hist_gpm = xr.open_dataset(
 with open('/work/bm1183/m301049/diurnal_cycle_dists/bt_iwp_fig_coeffs.pkl', 'rb') as f:
     bt_iwp_coeffs = pickle.load(f)
 
+# %% load bt_of_iwp
+bt_of_iwp = xr.open_dataset(
+    '/work/bm1183/m301049/diurnal_cycle_dists/bt_of_iwp.nc'
+).mean('time')
+iwp_of_bt = xr.DataArray(
+    np.log10(bt_of_iwp['iwp'].values),
+    coords={'bt': bt_of_iwp['bt_of_iwp'].values},
+    dims=['bt'])
+iwp_of_bt = iwp_of_bt.isel(bt=slice(45, None))
+
 # %% functions
 def calc_hc_albedo(a_cs, a_as):
     return (a_as - a_cs) / (a_cs * (a_as - 2) + 1)
@@ -39,12 +49,18 @@ def iwp_from_bt(bt):
     iwp = 10**((bt - intercept) / slope)
     return iwp
 
+def iwp_from_bt_corr(bt):
+    return 10 ** iwp_of_bt.interp(bt=bt).values
+
+
 # %% initialize datasets
 sw_vars = xr.Dataset()
 mean_sw_vars = pd.DataFrame()
 iwp_bins = np.logspace(-3, 2, 254)[::4]
-bt_bins = np.arange(175, 330, 1)[::2]
-iwp_bins_bt = iwp_from_bt(bt_bins)
+bt_bins = np.arange(150, 340, 1)
+bt_bins = np.insert(bt_bins, 0, 0)
+bt_bins = bt_bins[::2]
+iwp_bins_bt = iwp_from_bt_corr(bt_bins)
 time_bins = np.linspace(0, 24, 25)
 time_points = (time_bins[1:] + time_bins[:-1]) / 2
 binned_hc_albedo_iwp = np.zeros([len(iwp_bins) - 1, len(time_bins) - 1]) * np.nan

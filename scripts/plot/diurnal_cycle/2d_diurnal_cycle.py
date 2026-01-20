@@ -216,15 +216,15 @@ ax.set_ylabel("Normalized Histogram")
 # %% calculate mean incoming SW radiation for icon runs
 incoming_sw_4k = (
     (
-        hist_icon_4k["hist"].sel(iwp=slice(1e-1, None))
-        / hist_icon_4k["hist"].sel(iwp=slice(1e-1, None)).sum()
+        hist_icon_4k["hist"].sel(iwp=slice(1e-2, 1e-1))
+        / hist_icon_4k["hist"].sel(iwp=slice(1e-2, 1e-1)).sum()
     )
     * SW_in
 ).sum()
 incoming_sw_cont = (
     (
-        hist_icon_control["hist"].sel(iwp=slice(1e-1, None))
-        / hist_icon_control["hist"].sel(iwp=slice(1e-1, None)).sum()
+        hist_icon_control["hist"].sel(iwp=slice(1e-2, 1e-1))
+        / hist_icon_control["hist"].sel(iwp=slice(1e-2, 1e-1)).sum()
     )
     * SW_in
 ).sum()

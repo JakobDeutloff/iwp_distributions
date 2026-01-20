@@ -5,24 +5,23 @@ import glob
 import re
 
 # %% load ccic data
-color = {"all": "black", "sea": "blue", "land": "green"}
 names = ["all", "sea", "land"]
 hists_ccic = {}
 hists_gpm = {}
 files = glob.glob(
     "/work/bm1183/m301049/ccic_daily_cycle/*/ccic_cpcir_daily_cycle_distribution_2d*.nc"
 )
-files_all = [f for f in files if re.search(r"2d_\d{4}\.nc$", f)]
+files_all = [f for f in files if re.search(r"2d_all_\d{4}\.nc$", f)]
 files_sea = [f for f in files if re.search(r"2d_sea_\d{4}\.nc$", f)]
 hists_ccic["all"] = xr.open_mfdataset(files_all).load()
 hists_ccic["sea"] = xr.open_mfdataset(files_sea).load()
 hists_ccic["land"] = hists_ccic["all"] - hists_ccic["sea"]
 # %% load gpm data
 hists_gpm["all"] = xr.open_mfdataset(
-    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_*.nc"
+    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_all*.nc"
 ).load()
 hists_gpm["sea"] = xr.open_mfdataset(
-    "/work/bm1183/m301049/GPM_MERGIR/hists_sea/gpm_*.nc"
+    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_sea*.nc"
 ).load()
 hists_gpm["land"] = hists_gpm["all"] - hists_gpm["sea"]
 # %% coarsen hists 
