@@ -63,7 +63,7 @@ for name in names:
     hists_monthly[name] = normalise_histograms(hists[name])
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics_sea.nc").t2m
+temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %%  detrend and deseasonalize
 hists_detrend = {}
@@ -168,7 +168,7 @@ fig, axes = plot_2d_trend(
     err_feedback_bs["ccic"],
     dim="iwp",
 )
-fig.savefig("plots/diurnal_cycle/ccic_2d_trend.pdf")
+fig.savefig("plots/diurnal_cycle/publication/ccic_2d_trend.pdf", bbox_inches='tight')
 
 # %% plot slopes gpm
 fig, axes = plot_2d_trend(
@@ -181,7 +181,7 @@ fig, axes = plot_2d_trend(
     err_feedback_bs["gpm"],
     dim="bt",
 )
-fig.savefig("plots/diurnal_cycle/gpm_2d_trend.png", dpi=300)
+fig.savefig("plots/diurnal_cycle/publication/gpm_2d_trend.pdf", bbox_inches='tight')
 
 # %% plot slopes icon
 # 1 / K
@@ -197,35 +197,4 @@ fig, axes = plot_2d_trend(
 )
 fig.savefig("plots/diurnal_cycle/icon_2d_trend.png", dpi=300)
 
-
-# %% plot mean diurnal cycle
-mean_ccic = (
-    hists["ccic"].sel(iwp=slice(1e-1, 10)).sum(["time", "iwp"])["hist"]
-    / hists["ccic"].sel(iwp=slice(1e-1, 10))["hist"].sum()
-)
-mean_gpm = (
-    hists["gpm"].sel(bt=slice(190, 230)).sum(["time", "bt"])["hist"]
-    / hists["gpm"].sel(bt=slice(190, 230))["hist"].sum()
-)
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.plot(mean_ccic["local_time"], mean_ccic, label="CCIC", color=color["ccic"])
-ax.plot(mean_gpm["local_time"], mean_gpm, label="GPM", color=color["gpm"])
-ax.set_ylabel("Normalized Histogram")
-
-
-# %% calculate mean incoming SW radiation for icon runs
-incoming_sw_4k = (
-    (
-        hist_icon_4k["hist"].sel(iwp=slice(1e-2, 1e-1))
-        / hist_icon_4k["hist"].sel(iwp=slice(1e-2, 1e-1)).sum()
-    )
-    * SW_in
-).sum()
-incoming_sw_cont = (
-    (
-        hist_icon_control["hist"].sel(iwp=slice(1e-2, 1e-1))
-        / hist_icon_control["hist"].sel(iwp=slice(1e-2, 1e-1)).sum()
-    )
-    * SW_in
-).sum()
 # %%

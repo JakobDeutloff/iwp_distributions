@@ -24,7 +24,7 @@ color = {
 }
 
 # %% open histograms
-hist_gpm = xr.open_mfdataset("/work/bm1183/m301049/GPM_MERGIR/hists/gpm_*.nc").load()
+hist_gpm = xr.open_mfdataset("/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_all*.nc").load()
 hist_gpm = hist_gpm.sel(bt=slice(None, 240)).sum("bt")
 hist_gpm_month = resample_histograms(hist_gpm)
 

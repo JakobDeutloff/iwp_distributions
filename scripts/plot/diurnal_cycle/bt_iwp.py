@@ -55,7 +55,6 @@ ax.set_ylabel("$T_{\mathrm{b}}$ / K")
 ax.spines[["top", "right"]].set_visible(False)
 ax.legend()
 fig.tight_layout()
-fig.savefig("plots/diurnal_cycle/bt_vs_iwp.png", dpi=300)
 
 # %% calculate fraction of thin clouds for given Tb
 bins = np.arange(197, 261, 1)
@@ -65,12 +64,13 @@ mean_lc_frac = (ds["iwp"] < 1e-1).groupby_bins(ds["bt"], bins).mean()
 fig, ax = plt.subplots(figsize=(6, 4))
 points = (bins[:-1] + bins[1:]) / 2
 ax.plot(points, mean_lc_frac, color="k")
-ax.set_xlabel("$T_{\mathrm{b}}$ / K")
-ax.set_ylabel("Fraction of $I < 10^{-1}$ kg m$^{-2}$")
+ax.set_xlabel(r"$T_{\mathrm{b}}$ / K")
+ax.set_ylabel(r"Fraction of $I < 10^{-1}$ kg m$^{-2}$")
 ax.spines[["top", "right"]].set_visible(False)
 ax.set_xticks([200, 230, 260])
 ax.set_yticks([0, 0.3, 0.6])
 fig.tight_layout()
+fig.savefig("plots/diurnal_cycle/publication/fraction_thin_clouds.pdf", bbox_inches='tight')
 
 # %% load hists
 hists = {}
@@ -112,7 +112,7 @@ def linear_fit(iwp):
 bt_of_iwp_linear = linear_fit(np.log10(bt_of_iwp['iwp']))
 
 # %% plot bt of iwp
-fig, ax = plt.subplots(figsize=(5, 5))
+fig, ax = plt.subplots(figsize=(6, 4))
 ax.plot(bt_of_iwp['iwp'], bt_of_iwp.mean("time"), color="k", label="Mean")
 ax.fill_between(
     bt_of_iwp['iwp'],
@@ -130,8 +130,8 @@ ax.spines[["top", "right"]].set_visible(False)
 ax.set_xlabel("$I$ / kg m$^{-2}$")
 ax.set_ylabel("$T_{\mathrm{b}}$ / K")
 fig.tight_layout()
-fig.legend(frameon=False)
-fig.savefig("plots/diurnal_cycle/bt_of_iwp_area.png", dpi=300)
+ax.legend(frameon=False)
+fig.savefig("plots/diurnal_cycle/publication/bt_of_iwp_area.pdf", bbox_inches='tight')
 
 # %% save coeffs of linear fit 
 with open('/work/bm1183/m301049/diurnal_cycle_dists/bt_iwp_fig_coeffs.pkl', 'wb') as f:

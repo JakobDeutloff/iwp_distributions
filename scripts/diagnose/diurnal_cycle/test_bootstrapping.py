@@ -6,6 +6,7 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
+
 import xarray as xr
 from src.helper_functions import (
     normalise_histograms,
@@ -35,8 +36,8 @@ hists["gpm"] = xr.open_dataset(
 )
 cutoffs = {
     "ccic": {"iwp": slice(1e-1, None)},
-    "gpm": {"bt": slice(None, 260)},
-    "icon": {"iwp": slice(1e-1, None)},
+    "gpm": {"bt": slice(190, 260)},
+
 }
 SW_in = xr.open_dataarray(
     "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
@@ -48,8 +49,13 @@ albedo = {
     "ccic": albedo_iwp,
     "gpm": albedo_bt,
 }
+# %%cut data to relevant ranges
+for name in names:
+    hists[name] = hists[name].sel(cutoffs[name])
+    albedo[name] = albedo[name].sel(cutoffs[name])
+
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics_sea.nc").t2m
+temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %%
 hists_monthly = {}
@@ -65,12 +71,12 @@ for name in names:
     hists_detrend[name] = deseason(hists_detrend[name])
 
 # %%
-def calc_feedback_bs(seed, name='ccic', len_block=70):
+def calc_feedback_bs(name='ccic', len_block=36):
 
     n_sample = hists_detrend[name].time.size
     n_blocks = int(hists_monthly[name].time.size / len_block)
     max_idx_block = n_sample-len_block
-    np.random.seed(seed)
+    np.random.seed()
     block_idxs = np.random.randint(0, max_idx_block, n_blocks)
     time_idx = []
 
@@ -96,23 +102,23 @@ def calc_feedback_bs(seed, name='ccic', len_block=70):
     )  # W / m^2 / K
     return feedback_2d_bs
 
-# %% calc feedback ccic
-n_iterations = 2000
-with ProcessPoolExecutor(max_workers=128) as executor:
-    results = list(
-        tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['ccic'] * n_iterations), total=n_iterations)
-    )
-#  put the results into an xarray
-feedbacks = xr.concat(results, dim="iteration")
-feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d.nc")
+# %% test bootstrapping for different number of samples
+n_iterations = [16, 32, 64, 125, 250, 500, 1000, 2000]
+n_repeats = 5
+feedbacks_bs = {}
+for n in n_iterations:
+    print(f"Calculating bootstrap feedbacks for {n} iterations")
+    feedbacks = [None] * n_repeats
+    for j in range(n_repeats):
+        with ProcessPoolExecutor(max_workers=128) as executor:
+            results = list(
+                tqdm(executor.map(calc_feedback_bs, ['ccic'] * n), total=n)
+            )
+        #  put the results into an xarray
+        feedbacks[j] = xr.concat(results, dim="iteration")
+    feedbacks_bs[n] = xr.concat(feedbacks, dim="repeat_iteration")
 
-# %% calc feedback gpm
-with ProcessPoolExecutor(max_workers=128) as executor:
-    results = list(
-        tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['gpm'] * n_iterations), total=n_iterations)
-    )
-#  put the results into an xarray
-feedbacks_gpm = xr.concat(results, dim="iteration")
-feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc")
-
-# %%
+ # %%  save results
+import pickle
+with open("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d_sample_size_test.pkl", "wb") as f:
+    pickle.dump(feedbacks_bs, f)

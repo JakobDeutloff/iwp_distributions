@@ -43,5 +43,5 @@ for ax in axes:
 cb = fig.colorbar(im, ax=axes, orientation="horizontal", label="High Cloud Albedo", pad=0.15, shrink=0.8, aspect=30)
                   
 cb.set_ticks([0.2, 0.4, 0.6, 0.8])
-fig.savefig('plots/diurnal_cycle/albedo.pdf', bbox_inches='tight')
+fig.savefig('plots/diurnal_cycle/publication/albedo.pdf', bbox_inches='tight')
 # %%

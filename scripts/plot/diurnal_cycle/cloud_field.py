@@ -121,7 +121,7 @@ fig.colorbar(
     pad=0.1,
 )
 fig.tight_layout()
-fig.savefig("plots/diurnal_cycle/bt_iwp_snapshot.pdf")
+fig.savefig("plots/diurnal_cycle/publication/bt_iwp_snapshot.pdf")
 
 
 # %% big plot of brightness temperature
@@ -134,6 +134,5 @@ im = ax.pcolormesh(
     cmap="inferno",
 )
 fig.colorbar(im, ax=ax, label="$T_{b}$ / K")
-fig.savefig("plots/diurnal_cycle/bt_snapshot.png", dpi=300)
 
 # %%
