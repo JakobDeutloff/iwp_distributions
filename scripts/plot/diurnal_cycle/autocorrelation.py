@@ -33,9 +33,17 @@ axes[1].plot(lags / 12, autocorrs, color="k")
 axes[1].set_ylabel("Autocorrelation")
 axes[1].set_xlabel("Lag / Years")
 axes[0].set_xlabel("Time")
-axes[0].set_ylabel(r"$T_{\mathrm{2m}}$ / K")
-for ax in axes:
+axes[0].set_ylabel(r"$T$ / K")
+for ax, letter in zip(axes, ["a", "b"]):
     ax.spines[["top", "right"]].set_visible(False)
+    ax.text(
+        0.08,
+        0.9,
+        letter,
+        transform=ax.transAxes,
+        fontsize=22,
+        fontweight="bold",
+    )
 fig.savefig('plots/diurnal_cycle/publication/t2m_autocorrelation.pdf', bbox_inches='tight')
 
 # %%

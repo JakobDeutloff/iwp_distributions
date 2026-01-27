@@ -154,8 +154,8 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
         slopes[dim],
         slopes.T,
         cmap=cmap_change,
-        vmin=-7,
-        vmax=7,
+        vmin=-6,
+        vmax=6,
         rasterized=True,
     )
     axes[0, 0].scatter(
@@ -231,7 +231,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
         alpha=0.5,
     )
     axes[0, 4].spines[["top", "right"]].set_visible(False)
-    axes[0, 4].set_xlabel(" $\sum$ $\lambda$ / W m$^{-2}$ K")
+    axes[0, 4].set_xlabel(r"$\sum_{I}$ $\lambda$ / W m$^{-2}$ K$^{-1}$")
     axes[0, 4].set_xticks([0, np.round(feedback_cum.isel({dim:-1}).values, 2)])
 
     if dim == "bt":
@@ -239,7 +239,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
             ax.set_xlabel("Local Time / h")
             ax.set_ylim([200, 260])
             ax.set_yticks([200, 230, 260])
-        axes[0, 0].set_ylabel("Brightness Temperature / K")
+        axes[0, 0].set_ylabel(r"$T_{\mathrm{b}}$ / K")
     else:
         for ax in axes[0,:-1]:
             ax.set_yscale("log")
@@ -285,6 +285,17 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
     )
     cb4.set_ticks([-0.006, 0, 0.006])
     axes[1, 4].remove()
+
+    # add letters 
+    for ax, letter in zip(axes[0, :], ["a", "b", "c", "d", "e"]):
+        ax.text(
+            0.08,
+            0.88,
+            letter,
+            transform=ax.transAxes,
+            fontsize=22,
+            fontweight="bold",
+        )
 
     fig.tight_layout()
     return fig, axes

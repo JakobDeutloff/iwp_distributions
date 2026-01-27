@@ -1,8 +1,6 @@
 # %%
 import xarray as xr
-import matplotlib.pyplot as plt
 from src.helper_functions import (
-    normalise_histograms,
     deseason,
     detrend_hist_2d,
     regress_hist_temp_2d,
@@ -170,7 +168,7 @@ fig, axes = plot_2d_trend(
     err_feedback_bs["ccic"],
     dim="iwp",
 )
-#fig.savefig("plots/diurnal_cycle/publication/ccic_2d_trend.pdf", bbox_inches='tight')
+fig.savefig("plots/diurnal_cycle/publication/ccic_2d_trend.pdf", bbox_inches='tight')
 
 # %% plot slopes gpm
 fig, axes = plot_2d_trend(
@@ -183,7 +181,7 @@ fig, axes = plot_2d_trend(
     err_feedback_bs["gpm"],
     dim="bt",
 )
-#fig.savefig("plots/diurnal_cycle/publication/gpm_2d_trend.pdf", bbox_inches='tight')
+fig.savefig("plots/diurnal_cycle/publication/gpm_2d_trend.pdf", bbox_inches='tight')
 
 # %% plot slopes icon
 # 1 / K

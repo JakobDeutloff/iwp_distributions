@@ -36,11 +36,19 @@ axes[1].set_ylim(200, 260)
 axes[1].set_yticks([200, 230, 260])
 axes[0].set_ylabel("$I$ / kg m$^{-2}$")
 axes[1].set_ylabel(r"$T_{\mathrm{b}}$ / K")
-for ax in axes:
+for ax, letter in zip(axes, ['a', 'b']):
+    ax.text(
+        0.08,
+        0.9,
+        letter,
+        transform=ax.transAxes,
+        fontsize=22,
+        fontweight="bold",
+    )
     ax.set_xticks([6, 12, 18])
     ax.set_xlabel("Local Time / h")
     ax.spines[["top", "right"]].set_visible(False)
-cb = fig.colorbar(im, ax=axes, orientation="horizontal", label="High Cloud Albedo", pad=0.15, shrink=0.8, aspect=30)
+cb = fig.colorbar(im, ax=axes, orientation="horizontal", label=r"$\alpha_{\mathrm{cl}}$", pad=0.15, shrink=0.8, aspect=30)
                   
 cb.set_ticks([0.2, 0.4, 0.6, 0.8])
 fig.savefig('plots/diurnal_cycle/publication/albedo.pdf', bbox_inches='tight')

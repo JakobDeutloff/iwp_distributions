@@ -2,8 +2,6 @@
 import xarray as xr
 import matplotlib.pyplot as plt
 import ccic
-import numpy as np
-from scipy.stats import linregress
 from matplotlib.colors import LinearSegmentedColormap, LogNorm
 
 
@@ -120,6 +118,17 @@ fig.colorbar(
     extend="both",
     pad=0.1,
 )
+# add letter 
+for ax, letter, color in zip(axes, ["a", "b"], ['black', 'white']):
+    ax.text(
+        0.02,
+        0.93,
+        letter,
+        transform=ax.transAxes,
+        fontsize=22,
+        fontweight="bold",
+        color=color,
+    )
 fig.tight_layout()
 fig.savefig("plots/diurnal_cycle/publication/bt_iwp_snapshot.pdf")
 

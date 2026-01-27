@@ -30,10 +30,10 @@ cf_gpm = {}
 for name in names:
     cf_ccic[name] = hists_ccic[name]["hist"].sel(iwp=slice(1, None)).sum(
         "iwp"
-    ) / hists_ccic[name]["hist"].sum("iwp")
+    ) / hists_ccic[name]["hist"].sum(["iwp", "local_time"])
     cf_gpm[name] = hists_gpm[name]["hist"].sel(bt=slice(None, 232)).sum(
         "bt"
-    ) / hists_gpm[name]["hist"].sum("bt")
+    ) / hists_gpm[name]["hist"].sum(['bt', "local_time"])
 
 # %% normalise  cloud fractions
 cf_ccic_norm = {}
@@ -130,6 +130,7 @@ def plot_mean_histograms(cf):
     ax.legend(frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks([6, 12, 18])
+    ax.set_yticks([0.001, 0.0015, 0.002, 0.0025])
     fig.tight_layout()
 
     return fig
@@ -141,6 +142,15 @@ fig_gpm = plot_mean_histograms(cf_gpm)
 fig_gpm.savefig(
     "plots/diurnal_cycle/mean_gpm_diurnal_cycle_land_sea.pdf",
 )
+
+# %% calculate total cf 
+total_cf_ccic = {}
+total_cf_gpm = {}
+for name in names:
+    total_cf_ccic[name] = cf_ccic[name].sum("local_time").mean('time')
+    print(f'{name} total ccic cf: {total_cf_ccic[name].values}')
+    total_cf_gpm[name] = cf_gpm[name].sum("local_time").mean('time')
+    print(f'{name} total gpm cf: {total_cf_gpm[name].values}')
 
 
 # %% plot change of diurnal cycle
@@ -182,7 +192,7 @@ for name in ["land", "sea"]:
         slopes_ccic[name].local_time,
         slopes_ccic[name],
         color=color[name],
-        label=f"CCIC {name}",
+        label=f"$I$ {name}",
     )
     axes[1].fill_between(
         slopes_ccic[name].local_time,
@@ -196,7 +206,7 @@ for name in ["land", "sea"]:
         slopes_gpm[name],
         color=color[name],
         linestyle="--",
-        label=f"GPM {name}",
+        label=rf"$T_{{\mathrm{{b}}}} ~ \mathrm{{{name}}}$",
     )
     axes[1].fill_between(
         slopes_gpm[name].local_time,
@@ -209,7 +219,7 @@ axes[0].plot(
     slopes_ccic["all"].local_time,
     slopes_ccic["all"],
     color="black",
-    label=f"CCIC all",
+    label=f"$I$ all",
     linestyle="-",
 )
 axes[0].fill_between(
@@ -223,7 +233,7 @@ axes[0].plot(
     slopes_gpm["all"].local_time,
     slopes_gpm["all"],
     color="k",
-    label=f"GPM all",
+    label=r"$T_{\mathrm{b}}$ all",
     linestyle="--",
 )
 axes[0].fill_between(
@@ -247,6 +257,19 @@ for ax in axes:
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks([6, 12, 18])
     ax.set_yticks([-4, 0, 4])
+
+# add letters 
+for ax, letter in zip(axes, ["a", "b"]):
+    ax.text(
+        0.05,
+        1,
+        letter,
+        transform=ax.transAxes,
+        fontsize=22,
+        fontweight="bold",
+        va="top",
+    )
+
 
 axes[0].set_ylabel(r"$\dfrac{\mathrm{d}f}{f~\mathrm{d}T}$ / % K$^{-1}$")
 fig.tight_layout()
