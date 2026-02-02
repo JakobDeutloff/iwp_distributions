@@ -31,7 +31,7 @@ for name in names:
     cf_ccic[name] = hists_ccic[name]["hist"].sel(iwp=slice(1, None)).sum(
         "iwp"
     ) / hists_ccic[name]["hist"].sum(["iwp", "local_time"])
-    cf_gpm[name] = hists_gpm[name]["hist"].sel(bt=slice(None, 232)).sum(
+    cf_gpm[name] = hists_gpm[name]["hist"].sel(bt=slice(None, 231)).sum(
         "bt"
     ) / hists_gpm[name]["hist"].sum(['bt', "local_time"])
 
@@ -68,6 +68,32 @@ for name in names:
     hist_detrend = nan_detrend(cf_gpm_norm[name], dim="local_time")
     cf_gpm_deseason[name] = deseason(hist_detrend)
 
+# %% detrend and deseasonalize - test
+cf_ccic_deseason_test = {}
+cf_ccic_deseason_test_norm = {}
+cf_gpm_deseason_test = {}
+cf_gpm_deseason_test_norm = {}
+
+
+for name in names :
+    hist_detrend = nan_detrend(cf_ccic[name], dim="local_time")
+    cf_ccic_deseason_test[name] = deseason(hist_detrend)
+    cf_ccic_deseason_test_norm[name] = cf_ccic_deseason_test[name] / cf_ccic_deseason_test[name].sum("local_time")
+    hist_detrend = nan_detrend(cf_gpm[name], dim="local_time")
+    cf_gpm_deseason_test[name] = deseason(hist_detrend)
+    cf_gpm_deseason_test_norm[name] = cf_gpm_deseason_test[name] / cf_gpm_deseason_test[name].sum("local_time")
+
+
+# %%
+fig, ax = plt.subplots()
+ax.plot(cf_ccic_deseason_test_norm['all'].time, cf_ccic_deseason_test_norm['all'].isel(local_time=12), color='blue')
+ax.plot(cf_ccic_deseason['all'].time, cf_ccic_deseason['all'].isel(local_time=12), color='r')
+
+# %% plot mean diurnal cycle 
+fig, ax = plt.subplots()
+#ax.plot(cf_ccic['all'].local_time, cf_ccic['all'].mean('time'), color='k')
+ax.plot(cf_ccic_deseason['all'].local_time, cf_ccic_deseason['all'].mean('time'), color='r')
+ax.plot(cf_ccic_deseason_test_norm['all'].local_time, cf_ccic_deseason_test_norm['all'].mean('time'), color='b')
 # %% regression
 slopes_ccic = {}
 slopes_gpm = {}
@@ -75,10 +101,10 @@ err_ccic = {}
 err_gpm = {}
 for name in names:
     slopes_ccic[name], err_ccic[name] = regress_hist_temp_1d(
-        cf_ccic_deseason[name], temps_deseason[name], cf_ccic_norm[name]
+        cf_ccic_deseason[name], temps_deseason[name], cf_ccic_deseason[name]
     )
     slopes_gpm[name], err_gpm[name] = regress_hist_temp_1d(
-        cf_gpm_deseason[name], temps_deseason[name], cf_gpm_norm[name]
+        cf_gpm_deseason[name], temps_deseason[name], cf_gpm_deseason[name]
     )
 
 # %% load icon
@@ -109,39 +135,40 @@ for run in runs[1:]:
     )
 
 
-# %% plot mean histograms
-dims = {"ccic": "iwp", "gpm": "bt"}
+# %% plot diurnal cycle of both 
+fig, ax = plt.subplots(figsize=(6, 4))
 
+for name in names:
+    ax.plot(
+        cf_ccic[name].local_time,
+        cf_ccic[name].mean("time"),
+        color=color[name],
+        linestyle="-",
+    )
+    ax.plot(
+        cf_gpm[name].local_time,
+        cf_gpm[name].mean("time"),
+        color=color[name],
+        linestyle="--",
+    )
 
-def plot_mean_histograms(cf):
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    for name in names:
-        ax.plot(
-            cf[name].local_time,
-            cf[name].mean("time"),
-            color=color[name],
-            label=name,
-            linewidth=2,
-        )
+ax.set_xlim([0, 24])
+ax.set_xlabel("Local Time / h")
+ax.set_ylabel("$f_{\mathrm{d}}$")
+handles = [
+    plt.Line2D([0], [0], color="black", linestyle="-"),
+    plt.Line2D([0], [0], color="blue", linestyle="-"),
+    plt.Line2D([0], [0], color="green", linestyle="-"),
+    plt.Line2D([0], [0], color="grey", linestyle="-"),
+    plt.Line2D([0], [0], color="grey", linestyle="--"),
+]
+labels = ['All', 'Sea', 'Land', r'$I$', r'$T_{\mathrm{b}}$']
 
-    ax.set_xlim([0, 24])
-    ax.set_xlabel("Local Time / h")
-    ax.set_ylabel("$f$")
-    ax.legend(frameon=False)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.set_xticks([6, 12, 18])
-    ax.set_yticks([0.001, 0.0015, 0.002, 0.0025])
-    fig.tight_layout()
-
-    return fig
-
-
-fig_ccic = plot_mean_histograms(cf_ccic)
-fig_ccic.savefig("plots/diurnal_cycle/publication/mean_ccic_diurnal_cycle_land_sea.pdf")
-fig_gpm = plot_mean_histograms(cf_gpm)
-fig_gpm.savefig(
-    "plots/diurnal_cycle/mean_gpm_diurnal_cycle_land_sea.pdf",
-)
+ax.legend(handles, labels, frameon=False)
+ax.spines[["top", "right"]].set_visible(False)
+ax.set_xticks([6, 12, 18])
+ax.set_yticks([0.001, 0.002, 0.003])
+fig.savefig('plots/diurnal_cycle/publication/mean_dc.pdf', bbox_inches='tight')
 
 # %% calculate total cf 
 total_cf_ccic = {}
@@ -169,7 +196,7 @@ def plot_change_diurnal_cycle(slopes, err):
 
     ax.set_xlim([0, 24])
     ax.set_xlabel("Local Time / h")
-    ax.set_ylabel(r"$\dfrac{\mathrm{d}f}{f~\mathrm{d}T}$ / % K$^{-1}$")
+    ax.set_ylabel(r"$\dfrac{\mathrm{d}f_{\mathrm{d}}}{f_{\mathrm{d}}~\mathrm{d}T}$ / % K$^{-1}$")
     ax.legend()
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks([6, 12, 18])
@@ -181,9 +208,24 @@ def plot_change_diurnal_cycle(slopes, err):
 fig_ccic_change = plot_change_diurnal_cycle(slopes_ccic, err_ccic)
 fig_gpm_change = plot_change_diurnal_cycle(slopes_gpm, err_gpm)
 
+# %% calculate mean change in f
+for name in names:
+    mean_change_ccic = (slopes_ccic[name] * cf_ccic[name].mean("time")).mean(
+        "local_time"
+    )
+    print(f"{name} mean ccic change in f: {mean_change_ccic.values}  K^-1")
+    mean_change_gpm = (slopes_gpm[name] * cf_gpm[name].mean("time")).mean(
+        "local_time"
+    )
+    print(f"{name} mean gpm change in f: {mean_change_gpm.values}  K^-1")
+
 # %% make plot for paper
 fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
-
+labels = {
+    'all': 'All',
+    'sea': 'Sea',
+    'land': 'Land',
+}
 for ax in axes:
     ax.axhline(0, color="black", linewidth=0.5)
 
@@ -192,7 +234,7 @@ for name in ["land", "sea"]:
         slopes_ccic[name].local_time,
         slopes_ccic[name],
         color=color[name],
-        label=f"$I$ {name}",
+        label=f"$I$ {labels[name]}",
     )
     axes[1].fill_between(
         slopes_ccic[name].local_time,
@@ -206,7 +248,7 @@ for name in ["land", "sea"]:
         slopes_gpm[name],
         color=color[name],
         linestyle="--",
-        label=rf"$T_{{\mathrm{{b}}}} ~ \mathrm{{{name}}}$",
+        label=rf"$T_{{\mathrm{{b}}}} ~ \mathrm{{{labels[name]}}}$",
     )
     axes[1].fill_between(
         slopes_gpm[name].local_time,
@@ -219,7 +261,7 @@ axes[0].plot(
     slopes_ccic["all"].local_time,
     slopes_ccic["all"],
     color="black",
-    label=f"$I$ all",
+    label=f"$I$ All",
     linestyle="-",
 )
 axes[0].fill_between(
@@ -233,7 +275,7 @@ axes[0].plot(
     slopes_gpm["all"].local_time,
     slopes_gpm["all"],
     color="k",
-    label=r"$T_{\mathrm{b}}$ all",
+    label=r"$T_{\mathrm{b}}$ All",
     linestyle="--",
 )
 axes[0].fill_between(
@@ -271,7 +313,7 @@ for ax, letter in zip(axes, ["a", "b"]):
     )
 
 
-axes[0].set_ylabel(r"$\dfrac{\mathrm{d}f}{f~\mathrm{d}T}$ / % K$^{-1}$")
+axes[0].set_ylabel(r"$\dfrac{\mathrm{d}f_{\mathrm{d}}}{f_{\mathrm{d}}~\mathrm{d}T}$ / % K$^{-1}$")
 fig.tight_layout()
 
 fig.savefig("plots/diurnal_cycle/publication/diurnal_cycle_change_land_sea_paper.pdf")

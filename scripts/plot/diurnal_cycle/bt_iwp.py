@@ -6,8 +6,6 @@ import numpy as np
 import ccic
 from tqdm import tqdm
 from scipy.stats import linregress
-import glob
-import re
 
 # %%
 bts = (
@@ -37,18 +35,24 @@ ds = xr.Dataset(
         "lon": bts["lon"],
     },
 )
+
+# %%
+# Flatten spatial dimensions before groupby
+bt_flat = ds["bt"].stack(stacked=('time', 'lat', 'lon'))
+iwp_flat = ds["iwp"].stack(stacked=('time', 'lat', 'lon'))
 # %% plot bt vs iwp
 bins = np.logspace(-3, 2, 254)[::4]
 points = (bins[:-1] + bins[1:]) / 2
 mean_bt = ds["bt"].groupby_bins(ds["iwp"], bins).mean()
-std = ds["bt"].groupby_bins(ds["iwp"], bins).std()
+# %%
+q_05 = bt_flat.groupby_bins(iwp_flat, bins).quantile(0.05, dim='stacked')
+q_95 = bt_flat.groupby_bins(iwp_flat, bins).quantile(0.95, dim='stacked')
 
 # %%
 fig, ax = plt.subplots(figsize=(6, 6))
 ax.plot(points, mean_bt, color="k", label="Mean")
-ax.fill_between(
-    points, mean_bt - std, mean_bt + std, color="gray", alpha=0.5, label="± $\sigma$"
-)
+ax.plot(points, q_05, color="gray", linestyle="--", label="5th/95th percentile")
+#ax.plot(points, q_95, color="gray", linestyle="--")
 ax.set_xscale("log")
 ax.set_xlabel("$I$ / kg m$^{-2}$")
 ax.set_ylabel("$T_{\mathrm{b}}$ / K")
@@ -74,20 +78,17 @@ fig.savefig("plots/diurnal_cycle/publication/fraction_thin_clouds.pdf", bbox_inc
 
 # %% load hists
 hists = {}
-files = glob.glob(
-    "/work/bm1183/m301049/ccic_daily_cycle/*/ccic_cpcir_daily_cycle_distribution_2d*.nc"
-)
-files_all = [f for f in files if re.search(r"2d_all_\d{4}\.nc$", f)]
-hists['ccic'] = xr.open_mfdataset(files_all).load()
-hists["gpm"] = xr.open_mfdataset(
-    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_all*.nc"
-).load()
+hists['ccic'] = xr.open_dataset(
+        f"/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    )
+hists['gpm'] = xr.open_dataset(
+        f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+    )
 
 # %% plot Tb(I) from histograms
 area_fractions = {}
-timeslice = slice("2022-01", "2022-12")
 for name in ["ccic", "gpm"]:
-    area_fractions[name] = hists[name]["hist"].sel(time=timeslice).sum(["local_time"]) / hists[name].sel(time=timeslice)["size"]
+    area_fractions[name] = hists[name]["hist"].sum(["local_time"]) / hists[name]["size"]
 # %%
 bt_of_iwp = xr.zeros_like(area_fractions["ccic"])
 bt_of_iwp['iwp'] = bt_of_iwp['iwp'][::-1]
@@ -100,7 +101,7 @@ def interp_bt_of_iwp(t):
     return np.interp(ccic_af, gpm_af, gpm_bt)
 
 
-times = area_fractions["ccic"]["time"].sel(time=timeslice).values
+times = area_fractions["ccic"]["time"].values
 for t in tqdm(times):
     bt_of_iwp.loc[dict(time=t)] = interp_bt_of_iwp(t)
 
@@ -114,14 +115,6 @@ bt_of_iwp_linear = linear_fit(np.log10(bt_of_iwp['iwp']))
 # %% plot bt of iwp
 fig, ax = plt.subplots(figsize=(6, 4))
 ax.plot(bt_of_iwp['iwp'], bt_of_iwp.mean("time"), color="k", label="Mean")
-ax.fill_between(
-    bt_of_iwp['iwp'],
-    bt_of_iwp.mean("time") - bt_of_iwp.std("time"),
-    bt_of_iwp.mean("time") + bt_of_iwp.std("time"),
-    color="gray",
-    alpha=0.5,
-    label="± $\sigma$",
-)
 ax.set_yticks(bt_of_iwp.mean("time").sel(iwp=[10, 1, 0.1], method="nearest").values.round(0))
 ax.set_xscale("log")
 ax.set_xlim(5e-2, 2e1)
@@ -130,7 +123,6 @@ ax.spines[["top", "right"]].set_visible(False)
 ax.set_xlabel("$I$ / kg m$^{-2}$")
 ax.set_ylabel("$T_{\mathrm{b}}$ / K")
 fig.tight_layout()
-ax.legend(frameon=False)
 fig.savefig("plots/diurnal_cycle/publication/bt_of_iwp_area.pdf", bbox_inches='tight')
 
 # %% save coeffs of linear fit 

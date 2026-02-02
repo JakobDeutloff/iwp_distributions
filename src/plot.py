@@ -259,7 +259,7 @@ def plot_2d_trend(area_fraction, slopes, area_change, feedback, p_values, feedba
         extend="both",
         orientation="horizontal",
     )
-    cb1.set_ticks([-7, 0, 7])
+    cb1.set_ticks([-6, 0, 6])
     cb2 = fig.colorbar(
         im_hist,
         cax=axes[1, 1],

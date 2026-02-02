@@ -18,10 +18,10 @@ hists_ccic["sea"] = xr.open_mfdataset(files_sea).load()
 hists_ccic["land"] = hists_ccic["all"] - hists_ccic["sea"]
 # %% load gpm data
 hists_gpm["all"] = xr.open_mfdataset(
-    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_all*.nc"
+    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_extratropics_2d_hist_all*.nc"
 ).load()
 hists_gpm["sea"] = xr.open_mfdataset(
-    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_sea*.nc"
+    "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_extratropics_2d_hist_sea*.nc"
 ).load()
 hists_gpm["land"] = hists_gpm["all"] - hists_gpm["sea"]
 # %% coarsen hists 
@@ -42,11 +42,11 @@ for name in names:
 
 # %% save processed data
 for name in names:
-    hists_ccic_monthly[name].to_netcdf(
-        f"/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_{name}.nc"
-    )
+    # hists_ccic_monthly[name].to_netcdf(
+    #     f"/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_{name}.nc"
+    # )
     hists_gpm_monthly[name].to_netcdf(
-        f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_{name}.nc"
+        f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_extratropics_2d_monthly_{name}.nc"
     )
 
 # %%

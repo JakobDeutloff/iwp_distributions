@@ -22,10 +22,6 @@ hist_gpm = xr.open_dataset(
     "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
 )
 
-# %% load iwp bt fit coeffs
-with open('/work/bm1183/m301049/diurnal_cycle_dists/bt_iwp_fig_coeffs.pkl', 'rb') as f:
-    bt_iwp_coeffs = pickle.load(f)
-
 # %% load bt_of_iwp
 bt_of_iwp = xr.open_dataset(
     '/work/bm1183/m301049/diurnal_cycle_dists/bt_of_iwp.nc'
@@ -34,21 +30,10 @@ iwp_of_bt = xr.DataArray(
     np.log10(bt_of_iwp['iwp'].values),
     coords={'bt': bt_of_iwp['bt_of_iwp'].values},
     dims=['bt'])
-iwp_of_bt = iwp_of_bt.isel(bt=slice(45, None))
-
+iwp_of_bt = iwp_of_bt.drop_duplicates('bt')
 # %% functions
 def calc_hc_albedo(a_cs, a_as):
     return (a_as - a_cs) / (a_cs * (a_as - 2) + 1)
-
-def iwp_from_bt(bt):
-    """
-    Calculate iwp from BT by using inverse of linear fit from bt_iwp.py
-    """
-    slope = bt_iwp_coeffs['slope']
-    intercept = bt_iwp_coeffs['intercept']
-    iwp = 10**((bt - intercept) / slope)
-    return iwp
-
 def iwp_from_bt_corr(bt):
     return 10 ** iwp_of_bt.interp(bt=bt).values
 

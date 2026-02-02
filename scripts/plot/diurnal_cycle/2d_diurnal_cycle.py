@@ -197,4 +197,9 @@ fig, axes = plot_2d_trend(
 )
 #fig.savefig("plots/diurnal_cycle/icon_2d_trend.png", dpi=300)
 
+# %%check change in mean cf
+for name in names:
+    mean_cf_change = (slopes[name]/100 * cf[name].mean('time')).sum(dim=dim[name]).sum()
+    print(f'{name} mean cf change: {mean_cf_change.values} 1/K')
+
 # %%
