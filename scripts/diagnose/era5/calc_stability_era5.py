@@ -1,6 +1,9 @@
 # %% Imports
 import xarray as xr
 from dask.diagnostics import ProgressBar
+import dask 
+
+dask.config.set(scheduler='synchronous')
 
 # %% Paths and chunking
 path = "/work/bm1183/m301049/era5/monthly"
@@ -10,9 +13,13 @@ chunks = {"longitude": 10, "hybrid": -1, 'time': -1, 'latitude': -1}
 
 # %% Load data lazily
 t = xr.open_dataarray(f"{path}/t.nc", chunks=chunks)
-p = xr.open_dataarray(f"{path}/pressure_latlon.nc", chunks=chunks)
+p = xr.open_dataarray(f"{path}/p.nc", chunks=chunks)
 sw = xr.open_dataarray(f"{path}/sw.nc", chunks=chunks)
 lw = xr.open_dataarray(f"{path}/lw.nc", chunks=chunks)
+
+# %% unify time 
+sw['time'] = t['time']
+lw['time'] = t['time']
 
 # %% Constants
 R = 8.314  # J/mol/K
@@ -28,6 +35,12 @@ stability = ((t / p) * (R / cp) - dt_dp)
 w_r = (rad_tendency / stability)
 conv = (w_r.differentiate("hybrid") / dp)
 
+# %% close input dataarrays
+t.close()
+p.close()
+sw.close()
+lw.close()
+
 # %% Metadata
 rad_tendency.attrs = {"long_name": "Clear Sky Radiative tendency", "units": "K/day"}
 rad_tendency.name = "net_rad_tendency"
@@ -42,11 +55,11 @@ conv.name = "convergence"
 
 # %% Save to Zarr — fast, parallelized on one machine
 datasets = {
-    "rad_tendency": rad_tendency,
-    "lapse_rate": dt_dp,
-    "stability": stability,
+    'rad_tendency': rad_tendency,
+    'lapse_rate': dt_dp,
+    'stability': stability,
     "subsidence": w_r,
-    "convergence": conv,
+    "convergence": conv
 }
 
 with ProgressBar():
@@ -54,4 +67,5 @@ with ProgressBar():
         print(f"Saving {name}")
         encoding = {arr.name: {"chunksizes": [arr.sizes[dim] if dim != "longitude" else 10 for dim in arr.dims]}}
         arr.to_netcdf(f"{path}/{name}.nc", encoding=encoding)
+        arr.close()
 # %%

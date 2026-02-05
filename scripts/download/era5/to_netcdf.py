@@ -16,4 +16,10 @@ for var, filename in files.items():
     ds.to_netcdf(f"{path}/{var}.nc", encoding=encoding)
     ds.close()
 
+# %% chunk pressure 
+p =  xr.open_dataarray(f"{path}/pressure_latlon.nc", chunks={})
+p.name = "pressure"
+encoding = {p.name: {"chunksizes": [p.sizes[dim] if dim != "longitude" else 10 for dim in p.dims]}}
+p.to_netcdf(f"{path}/p.nc", encoding=encoding)
+
 # %%

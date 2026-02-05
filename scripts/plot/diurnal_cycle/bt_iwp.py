@@ -87,8 +87,9 @@ hists['gpm'] = xr.open_dataset(
 
 # %% plot Tb(I) from histograms
 area_fractions = {}
+dim = {'ccic': 'iwp', 'gpm': 'bt'}
 for name in ["ccic", "gpm"]:
-    area_fractions[name] = hists[name]["hist"].sum(["local_time"]) / hists[name]["size"]
+    area_fractions[name] = hists[name]["hist"].sum(["local_time"]) / hists[name]['hist'].sum(['local_time', dim[name]])
 # %%
 bt_of_iwp = xr.zeros_like(area_fractions["ccic"])
 bt_of_iwp['iwp'] = bt_of_iwp['iwp'][::-1]

@@ -17,11 +17,11 @@ im = axes[0].pcolor(
     albedo_iwp["iwp"],
     albedo_iwp["hc_albedo"],
     rasterized=True,
-    vmin=0.2,
+    vmin=0.1,
     vmax=0.8,
 )
 axes[0].set_yscale("log")
-axes[0].set_ylim(10, 1e-1)
+axes[0].set_ylim(10, 1e-2)
 
 
 axes[1].pcolor(
@@ -29,11 +29,11 @@ axes[1].pcolor(
     albedo_bt["bt"],
     albedo_bt["hc_albedo"],
     rasterized=True,
-    vmin=0.2,
+    vmin=0.1,
     vmax=0.8,
 )
-axes[1].set_ylim(200, 260)
-axes[1].set_yticks([200, 230, 260])
+axes[1].set_ylim(200, 290)
+axes[1].set_yticks([200, 230, 260, 290])
 axes[0].set_ylabel("$I$ / kg m$^{-2}$")
 axes[1].set_ylabel(r"$T_{\mathrm{b}}$ / K")
 for ax, letter in zip(axes, ['a', 'b']):
@@ -50,6 +50,6 @@ for ax, letter in zip(axes, ['a', 'b']):
     ax.spines[["top", "right"]].set_visible(False)
 cb = fig.colorbar(im, ax=axes, orientation="horizontal", label=r"$\alpha_{\mathrm{cl}}$", pad=0.15, shrink=0.8, aspect=30)
                   
-cb.set_ticks([0.2, 0.4, 0.6, 0.8])
+cb.set_ticks([0.1, 0.45, 0.8])
 fig.savefig('plots/diurnal_cycle/publication/albedo.pdf', bbox_inches='tight')
 # %%

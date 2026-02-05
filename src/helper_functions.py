@@ -209,3 +209,27 @@ def lowpass_filter(da, cutoff_period_years=3):
 
     # Create output DataArray with same coordinates
     return xr.DataArray(filtered_data, coords=da.coords, dims=da.dims)
+
+def read_era5_vars(mode='all'):
+    
+    if mode == 'all':
+        path = "/work/bm1183/m301049/era5/monthly"
+        vars = ['t', 'p', 'rad_tendency', 'stability', 'subsidence', 'convergence']
+        dataarrays = [xr.open_dataarray(f"{path}/{var}.nc", chunks={}, decode_timedelta=False) for var in vars]
+        dataarrays_uni = [da.assign_coords(time=dataarrays[0]['time']) for da in dataarrays]
+        ds_merged = xr.merge(dataarrays_uni, compat='override')
+    else:
+        path = "/work/bm1183/m301049/era5/monthly/averages"
+        vars = ['t', 'p', 'rad', 'stability', 'subsidence', 'convergence']
+        dataarrays = [xr.open_dataarray(f"{path}/{var}_mean.nc", chunks={}, decode_timedelta=False) for var in vars]
+        dataarrays_uni = [da.assign_coords(time=dataarrays[0]['time']) for da in dataarrays]
+        ds_merged = xr.merge(dataarrays_uni, compat='override')
+    return ds_merged
+
+def calculate_jj_mean(ds):
+    ds_spring = ds.sel(time=ds['time.month']<7).groupby('time.year').mean(dim='time')
+    ds_spring = ds_spring.isel(year=slice(1, None))  # remove first year
+    ds_spring['year'] = ds_spring['year'] - 1  # shift year to starting year of july-june period
+    ds_fall = ds.sel(time=ds['time.month']>=7).groupby('time.year').mean(dim='time')
+    ds_jj = xr.concat([ds_spring, ds_fall], dim='year').sortby('year').groupby('year').mean(dim='year')
+    return ds_jj

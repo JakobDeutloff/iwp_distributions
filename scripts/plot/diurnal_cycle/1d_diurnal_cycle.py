@@ -68,32 +68,6 @@ for name in names:
     hist_detrend = nan_detrend(cf_gpm_norm[name], dim="local_time")
     cf_gpm_deseason[name] = deseason(hist_detrend)
 
-# %% detrend and deseasonalize - test
-cf_ccic_deseason_test = {}
-cf_ccic_deseason_test_norm = {}
-cf_gpm_deseason_test = {}
-cf_gpm_deseason_test_norm = {}
-
-
-for name in names :
-    hist_detrend = nan_detrend(cf_ccic[name], dim="local_time")
-    cf_ccic_deseason_test[name] = deseason(hist_detrend)
-    cf_ccic_deseason_test_norm[name] = cf_ccic_deseason_test[name] / cf_ccic_deseason_test[name].sum("local_time")
-    hist_detrend = nan_detrend(cf_gpm[name], dim="local_time")
-    cf_gpm_deseason_test[name] = deseason(hist_detrend)
-    cf_gpm_deseason_test_norm[name] = cf_gpm_deseason_test[name] / cf_gpm_deseason_test[name].sum("local_time")
-
-
-# %%
-fig, ax = plt.subplots()
-ax.plot(cf_ccic_deseason_test_norm['all'].time, cf_ccic_deseason_test_norm['all'].isel(local_time=12), color='blue')
-ax.plot(cf_ccic_deseason['all'].time, cf_ccic_deseason['all'].isel(local_time=12), color='r')
-
-# %% plot mean diurnal cycle 
-fig, ax = plt.subplots()
-#ax.plot(cf_ccic['all'].local_time, cf_ccic['all'].mean('time'), color='k')
-ax.plot(cf_ccic_deseason['all'].local_time, cf_ccic_deseason['all'].mean('time'), color='r')
-ax.plot(cf_ccic_deseason_test_norm['all'].local_time, cf_ccic_deseason_test_norm['all'].mean('time'), color='b')
 # %% regression
 slopes_ccic = {}
 slopes_gpm = {}
@@ -101,10 +75,10 @@ err_ccic = {}
 err_gpm = {}
 for name in names:
     slopes_ccic[name], err_ccic[name] = regress_hist_temp_1d(
-        cf_ccic_deseason[name], temps_deseason[name], cf_ccic_deseason[name]
+        cf_ccic_deseason[name], temps_deseason[name], cf_ccic_norm[name]
     )
     slopes_gpm[name], err_gpm[name] = regress_hist_temp_1d(
-        cf_gpm_deseason[name], temps_deseason[name], cf_gpm_deseason[name]
+        cf_gpm_deseason[name], temps_deseason[name], cf_gpm_norm[name]
     )
 
 # %% load icon
@@ -289,7 +263,7 @@ axes[0].plot(
     slopes_ccic["all"].local_time,
     slopes_icon["jed0022"],
     color="red",
-    label="ICON +4K",
+    label="GSRM +4K",
 )
 
 for ax in axes:
@@ -317,5 +291,9 @@ axes[0].set_ylabel(r"$\dfrac{\mathrm{d}f_{\mathrm{d}}}{f_{\mathrm{d}}~\mathrm{d}
 fig.tight_layout()
 
 fig.savefig("plots/diurnal_cycle/publication/diurnal_cycle_change_land_sea_paper.pdf")
+
+# %% numbers for paper 
+print(f"ccic: {slopes_ccic['all'].min()}")
+print(f"gpm: {slopes_gpm['all'].min()}")
 
 # %%
