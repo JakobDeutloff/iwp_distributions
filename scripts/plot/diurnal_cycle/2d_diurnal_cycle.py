@@ -5,7 +5,7 @@ from src.helper_functions import (
     detrend_hist_2d,
     regress_hist_temp_2d,
 )
-from src.plot import definitions, plot_2d_trend
+from src.plot import definitions, plot_2d_trend, plot_2d_trend_talk
 from scipy.signal import detrend
 
 
@@ -50,7 +50,7 @@ hist_icon_control = (
 )
 hist_icon_4k = (
     xr.open_dataset(
-        "/work/bm1183/m301049/icon_hcap_data/plus4K/production/daily_cycle_hist_2d.nc"
+        "/work/bm1183/m301049/icon_hcap_data/plus2K/production/daily_cycle_hist_2d.nc"
     )
     .coarsen(iwp=4, boundary="trim")
     .sum()
@@ -93,7 +93,7 @@ hist_icon_4k_norm = hist_icon_4k["hist"].sum("time") / hist_icon_4k["hist"].sum(
     ["time", "local_time"]
 )
 slopes["icon"] = ((hist_icon_4k_norm - hist_icon_control_norm) * 100) / (
-    4.0 * hist_icon_control_norm
+    2.0 * hist_icon_control_norm
 )  # % / K
 
 # %% calculate feedback
@@ -160,7 +160,7 @@ err_feedback_bs["icon"] = xr.zeros_like(feedback_cum_bs["icon"])
 # %% plot slopes ccic
 fig, axes = plot_2d_trend(
     cf["ccic"].mean('time'),
-    slopes["ccic"],
+    slopes["ccic"]-slopes['ccic'].mean('local_time'),
     cf_change["ccic"],
     feedbacks["ccic"],
     p_values["ccic"],
@@ -168,7 +168,7 @@ fig, axes = plot_2d_trend(
     err_feedback_bs["ccic"],
     dim="iwp",
 )
-fig.savefig("plots/diurnal_cycle/publication/ccic_2d_trend.pdf", bbox_inches='tight')
+#fig.savefig("plots/diurnal_cycle/publication/ccic_2d_trend.pdf", bbox_inches='tight')
 
 # %% plot slopes gpm
 fig, axes = plot_2d_trend(
@@ -201,5 +201,31 @@ fig, axes = plot_2d_trend(
 for name in names:
     mean_cf_change = (slopes[name]/100 * cf[name].mean('time')).sum(dim=dim[name]).sum()
     print(f'{name} mean cf change: {mean_cf_change.values} 1/K')
+
+# %% plots for talk
+fig, axes = plot_2d_trend_talk(
+    cf["ccic"].mean('time'),
+    slopes["ccic"],
+    cf_change["ccic"],
+    feedbacks["ccic"],
+    p_values["ccic"],
+    feedback_cum_bs["ccic"],
+    err_feedback_bs["ccic"],
+    dim="iwp",
+)
+fig.savefig("plots/diurnal_cycle/talk/ccic_2d_trend_talk.png", bbox_inches='tight', dpi=300)
+
+# %%
+fig, axes = plot_2d_trend_talk(
+    cf["gpm"].mean('time'),
+    slopes["gpm"],
+    cf_change["gpm"],
+    feedbacks["gpm"],
+    p_values["gpm"],
+    feedback_cum_bs["gpm"],
+    err_feedback_bs["gpm"],
+    dim="bt",
+)
+fig.savefig("plots/diurnal_cycle/talk/gpm_2d_trend_talk.png", bbox_inches='tight', dpi=300)
 
 # %%

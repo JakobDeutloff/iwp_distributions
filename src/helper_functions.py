@@ -233,3 +233,11 @@ def calculate_jj_mean(ds):
     ds_fall = ds.sel(time=ds['time.month']>=7).groupby('time.year').mean(dim='time')
     ds_jj = xr.concat([ds_spring, ds_fall], dim='year').sortby('year').groupby('year').mean(dim='year')
     return ds_jj
+
+def calculate_jj_sum(hist):
+    hist_spring = hist.sel(time=hist['time.month']<7).groupby('time.year').sum(dim='time')
+    hist_spring = hist_spring.isel(year=slice(1, None))  # remove first year
+    hist_spring['year'] = hist_spring['year'] - 1  # shift year to starting year of july-june period
+    hist_fall = hist.sel(time=hist['time.month']>=7).groupby('time.year').sum(dim='time')
+    hist_jj = xr.concat([hist_spring, hist_fall], dim='year').sortby('year').groupby('year').sum(dim='year')
+    return hist_jj

@@ -33,7 +33,8 @@ iwp_of_bt = xr.DataArray(
 iwp_of_bt = iwp_of_bt.drop_duplicates('bt')
 # %% functions
 def calc_hc_albedo(a_cs, a_as):
-    return (a_as - a_cs) / (a_cs * (a_as - 2) + 1)
+    return (a_as - a_cs) / (1 - a_cs)
+    #return (a_as - a_cs) / (a_cs * (a_as - 2) + 1)
 def iwp_from_bt_corr(bt):
     return 10 ** iwp_of_bt.interp(bt=bt).values
 
@@ -52,7 +53,7 @@ binned_hc_albedo_iwp = np.zeros([len(iwp_bins) - 1, len(time_bins) - 1]) * np.na
 binned_hc_albedo_bt = np.zeros([len(bt_bins) - 1, len(time_bins) - 1]) * np.nan
 
 # %% set mask
-mask_parameterisation = (ds['mask_low_cloud'] == 0)
+mask_parameterisation = True #(ds['mask_low_cloud'] == 0)
 
 # %% calculate high cloud albedo
 sw_vars["wetsky_albedo"] = np.abs(ds["rsutws"] / ds["rsdt"])
@@ -101,7 +102,7 @@ albedo_iwp = xr.Dataset(
         "local_time": time_points,
     },
 )
-albedo_iwp.to_netcdf('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc')
+#albedo_iwp.to_netcdf('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc')
 
 # %%
 albedo_bt = xr.Dataset(
@@ -115,4 +116,18 @@ albedo_bt = xr.Dataset(
 )
 albedo_bt.to_netcdf('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc')
 
+# %% plot albedo 
+fig, ax = plt.subplots(figsize=(8, 6))
+im = ax.pcolor(
+    albedo_iwp['local_time'], 
+    albedo_iwp['iwp'], 
+    albedo_iwp['hc_albedo'],
+    cmap='viridis',
+    shading='auto'
+)
+ax.set_xlabel('Local Time (hours)')
+ax.set_ylabel('IWP (g/m2)')
+ax.set_yscale('log')
+ax.invert_yaxis()
+plt.colorbar(im, ax=ax)
 # %%

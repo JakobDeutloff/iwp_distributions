@@ -68,4 +68,76 @@ for run in runs:
         color=colors[run],
     )
 
+# %% calculate dc change from 2d hists
+hists_2d_norm = {}
+relative_change = {}
+absolute_change = {}
+
+for run in runs:
+    hists_2d_norm[run] = hists_2d[run]["hist"] / hists_2d[run]["hist"].sum("local_time")
+
+for run in runs[1:]:
+    relative_change[run] = ((hists_2d_norm[run] - hists_2d_norm[runs[0]]) * 100) / (
+        temp_delta[run] * hists_2d_norm[runs[0]]
+    )  # % / K
+
+for run in runs[1:]:
+    absolute_change[run] = (relative_change[run] / 100) * (
+        hists_2d['jed0011']["hist"] / hists_2d['jed0011']["hist"].sum()
+    )
+
+
+# %% plot 2d hists
+fig, axes = plt.subplots(2, 2, figsize=(8, 10), sharey=True, sharex=True)
+
+
+for i, run in enumerate(runs[1:]):
+    # relative change
+    im_rel = axes[i, 0].pcolormesh(
+        hists_2d[run]["local_time"],
+        hists_2d[run]["iwp"],
+        relative_change[run].T,
+        rasterized=True,
+        cmap="bwr",
+        vmin=-3,
+        vmax=3,
+    )
+
+    axes[i, 1].invert_yaxis()
+    axes[i, 0].set_yscale("log")
+    axes[i, 0].set_ylim([10, 1e-1])
+
+    # absolute change
+    im_abs = axes[i, 1].pcolormesh(
+        hists_2d[run]["local_time"],
+        hists_2d[run]["iwp"],
+        absolute_change[run].T,
+        rasterized=True,
+        cmap="PRGn",
+        vmax=1.5e-6,
+        vmin=-1.5e-6,
+    )
+
+    axes[i, 1].invert_yaxis()
+    axes[i, 1].set_yscale("log")
+    axes[i, 1].set_ylim([10, 1e-1])
+
+axes[1, 1].set_xlabel("Local Time / h")
+axes[1, 0].set_xlabel("Local Time / h")
+axes[0, 0].set_ylabel("$I$ / kg m$^{-2}$")
+axes[1, 0].set_ylabel("$I$ / kg m$^{-2}$")
+fig.colorbar(
+    im_rel,
+    ax=axes[:, 0],
+    label=r"$\frac{\mathrm{d}P}{P\mathrm{d}T}$ / % K$^{-1}$",
+    orientation="horizontal",
+    pad=0.1,
+)
+fig.colorbar(
+    im_abs,
+    ax=axes[:, 1],
+    label=r"$\frac{\mathrm{d}P}{\mathrm{d}T}$ / K$^{-1}$",
+    orientation="horizontal",
+    pad=0.1,
+)
 # %%

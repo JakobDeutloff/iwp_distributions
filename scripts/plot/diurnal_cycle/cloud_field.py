@@ -133,15 +133,103 @@ fig.tight_layout()
 fig.savefig("plots/diurnal_cycle/publication/bt_iwp_snapshot.pdf")
 
 
-# %% big plot of brightness temperature
-fig, ax = plt.subplots(figsize=(16, 6))
-lat_range = slice(-30, 30)
-im = ax.pcolormesh(
-    bts["lon"],
+# %% plot for talk 
+fig, axes = plt.subplots(1, 2, figsize=(10, 6), sharex=True, sharey=True)
+background = (1, 1, 1)
+white_cmap = LinearSegmentedColormap.from_list("white", [background, "#110734"])
+lat_range = slice(-5, 1)
+lon_range = slice(22, 29)
+axes[1].set_facecolor('white')
+
+im0 = axes[1].pcolormesh(
+    bts["lon"].sel(lon=lon_range),
     bts["lat"].sel(lat=lat_range),
-    bts["Tb"].sel(lat=lat_range).isel(time=0),
+    bts["Tb"].sel(lat=lat_range, lon=lon_range).isel(time=0),
     cmap="inferno",
+    rasterized=True,
+    vmin=200,
+    vmax=290,
 )
-fig.colorbar(im, ax=ax, label="$T_{b}$ / K")
+im1 = axes[0].pcolormesh(
+    iwp["longitude"].sel(longitude=lon_range),
+    iwp["latitude"].sel(latitude=lat_range),
+    iwp.sel(latitude=lat_range, longitude=lon_range).isel(time=0),
+    cmap=white_cmap,
+    norm=LogNorm(1e-3, 1e1),
+    rasterized=True,
+)
+ct0 = axes[1].contour(
+    bts["lon"].sel(lon=lon_range),
+    bts["lat"].sel(lat=lat_range),
+    bts["Tb"].sel(lat=lat_range, lon=lon_range).isel(time=0),
+    levels=[231],
+    colors="white",
+    linewidths=2,
+    linestyles=["solid"],
+)
+ct1 = axes[0].contour(
+    iwp["longitude"].sel(longitude=lon_range),
+    iwp["latitude"].sel(latitude=lat_range),
+    iwp.sel(latitude=lat_range, longitude=lon_range).isel(time=0),
+    levels=[1],
+    colors="black",
+    linewidths=2,
+    linestyles=["solid"],
+)
+for ax in axes:
+    ax.set_xlabel("Longitude / °E")
+    ax.spines[["top", "right"]].set_visible(False)
+axes[0].set_ylabel("Latitude / °N")
+
+fig.colorbar(
+    im0,
+    ax=axes[1],
+    label="$T_{b}$ / K",
+    orientation="horizontal",
+    extend="both",
+    pad=0.1,
+)
+fig.colorbar(
+    im1,
+    ax=axes[0],
+    label="$I$ / kg m$^{-2}$",
+    orientation="horizontal",
+
+    extend="both",
+    pad=0.1,
+)
+
+fig.tight_layout()
+fig.savefig("plots/diurnal_cycle/talk/bt_iwp_cont.png", dpi=300)
+
+
+# %% fine grained vs coarse grained 
+bts_coarse = bts.coarsen(lat=26, lon=26, boundary="trim").mean()
+white_cmap = LinearSegmentedColormap.from_list("white", [(1, 1, 1), (0, 0, 0)])
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+im_fine = axes[0].pcolormesh(
+    bts["lon"].sel(lon=lon_range),
+    bts["lat"].sel(lat=lat_range),
+    bts["Tb"].sel(lat=lat_range, lon=lon_range).isel(time=0),
+    cmap=white_cmap,
+    rasterized=True,
+    vmin=200,
+    vmax=290,
+)
+
+im_coarse = axes[1].pcolormesh(
+    bts_coarse["lon"].sel(lon=lon_range),
+    bts_coarse["lat"].sel(lat=lat_range),
+    bts_coarse["Tb"].sel(lat=lat_range, lon=lon_range).isel(time=0),
+    cmap=white_cmap,
+    rasterized=True,
+    vmin=200,
+    vmax=290,
+)
+for ax in axes:
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_xlabel("Longitude / °E")
+axes[0].set_ylabel("Latitude / °N")
+fig.savefig("plots/diurnal_cycle/talk/bt_fine_coarse.png", dpi=300)
 
 # %%
