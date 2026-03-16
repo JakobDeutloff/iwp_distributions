@@ -39,8 +39,8 @@ for name in names:
 cf_ccic_norm = {}
 cf_gpm_norm = {}
 for name in names:
-    cf_ccic_norm[name] = cf_ccic[name] #/ cf_ccic[name].sum("local_time")
-    cf_gpm_norm[name] = cf_gpm[name] #/ cf_gpm[name].sum("local_time")
+    cf_ccic_norm[name] = cf_ccic[name] / cf_ccic[name].sum("local_time")
+    cf_gpm_norm[name] = cf_gpm[name] / cf_gpm[name].sum("local_time")
 
 
 # %% load era5 surface temp
@@ -118,12 +118,6 @@ for name in names:
         color=color[name],
         linestyle="-",
     )
-    ax.plot(
-        cf_gpm[name].local_time,
-        cf_gpm[name].mean("time"),
-        color=color[name],
-        linestyle="--",
-    )
 
 ax.set_xlim([0, 24])
 ax.set_xlabel("Local Time / h")
@@ -131,11 +125,8 @@ ax.set_ylabel("$f_{\mathrm{d}}$")
 handles = [
     plt.Line2D([0], [0], color="black", linestyle="-"),
     plt.Line2D([0], [0], color="blue", linestyle="-"),
-    plt.Line2D([0], [0], color="green", linestyle="-"),
-    plt.Line2D([0], [0], color="grey", linestyle="-"),
-    plt.Line2D([0], [0], color="grey", linestyle="--"),
-]
-labels = ["All", "Sea", "Land", r"$I$", r"$T_{\mathrm{b}}$"]
+    plt.Line2D([0], [0], color="green", linestyle="-"),]
+labels = ["All", "Ocean", "Land"]
 
 ax.legend(handles, labels, frameon=False)
 ax.spines[["top", "right"]].set_visible(False)
@@ -198,7 +189,7 @@ for name in names:
 fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
 labels = {
     "all": "All",
-    "sea": "Sea",
+    "sea": "Ocean",
     "land": "Land",
 }
 for ax in axes:
@@ -209,26 +200,12 @@ for name in ["land", "sea"]:
         slopes_ccic[name].local_time,
         slopes_ccic[name],
         color=color[name],
-        label=f"$I$ {labels[name]}",
+        label=f"{labels[name]}",
     )
     axes[1].fill_between(
         slopes_ccic[name].local_time,
         slopes_ccic[name] - err_ccic[name],
         slopes_ccic[name] + err_ccic[name],
-        color=color[name],
-        alpha=0.3,
-    )
-    axes[1].plot(
-        slopes_gpm[name].local_time,
-        slopes_gpm[name],
-        color=color[name],
-        linestyle="--",
-        label=rf"$T_{{\mathrm{{b}}}} ~ \mathrm{{{labels[name]}}}$",
-    )
-    axes[1].fill_between(
-        slopes_gpm[name].local_time,
-        slopes_gpm[name] - err_gpm[name],
-        slopes_gpm[name] + err_gpm[name],
         color=color[name],
         alpha=0.3,
     )
@@ -298,6 +275,70 @@ fig.savefig("plots/diurnal_cycle/publication/diurnal_cycle_change_land_sea_paper
 # %% numbers for paper
 print(f"ccic: {slopes_ccic['all'].min()}")
 print(f"gpm: {slopes_gpm['all'].min()}")
+
+# %% plot non-normalised change in f_d
+# detrend and deseasonalize
+cf_ccic_deseason_raw = {}
+cf_gpm_deseason_raw = {}
+for name in names:
+    cf_detrend = nan_detrend(cf_ccic[name], dim="local_time")
+    cf_ccic_deseason_raw[name] = deseason(cf_detrend)
+    cf_detrend = nan_detrend(cf_gpm[name], dim="local_time")
+    cf_gpm_deseason_raw[name] = deseason(cf_detrend)
+
+#regression
+slopes_ccic_raw = {}
+slopes_gpm_raw = {}
+err_ccic_raw = {}
+err_gpm_raw = {}
+for name in names:
+    slopes_ccic_raw[name], err_ccic_raw[name] = regress_hist_temp_1d(
+        cf_ccic_deseason_raw[name], temps_deseason[name], cf_ccic[name]
+    )
+    slopes_gpm_raw[name], err_gpm_raw[name] = regress_hist_temp_1d(
+        cf_gpm_deseason_raw[name], temps_deseason[name], cf_gpm[name]
+    )
+
+fig, ax = plt.subplots(figsize=(5, 3.5))
+ax.axhline(0, color="black", linewidth=0.5)
+ax.plot(
+    slopes_ccic_raw["all"].local_time,
+    slopes_ccic_raw["all"],
+    color="black",
+    label = f"$I$ All",
+)
+ax.fill_between(
+    slopes_ccic_raw["all"].local_time,
+    slopes_ccic_raw["all"] - err_ccic_raw["all"],
+    slopes_ccic_raw["all"] + err_ccic_raw["all"],
+    color="black",
+    alpha=0.3,
+)
+ax.plot(
+    slopes_gpm_raw["all"].local_time,
+    slopes_gpm_raw["all"],
+    color="k",
+    linestyle="--",
+    label=r"$T_{\mathrm{b}}$ All",
+)
+ax.fill_between(
+    slopes_gpm_raw["all"].local_time,
+    slopes_gpm_raw["all"] - err_gpm_raw["all"],
+    slopes_gpm_raw["all"] + err_gpm_raw["all"],
+    color="k",
+    alpha=0.3,
+)
+
+ax.set_xlim([0, 24])
+ax.set_xlabel("Local Time / h")
+ax.set_ylabel(
+    r"$\dfrac{\mathrm{d}f_{\mathrm{d}}}{f_{\mathrm{d}}~\mathrm{d}T}$ / % K$^{-1}$"
+)
+ax.spines[["top", "right"]].set_visible(False)
+ax.set_xticks([6, 12, 18])
+ax.legend(frameon=False)
+fig.savefig("plots/diurnal_cycle/publication/diurnal_cycle_change_all_nonnormalised.pdf", bbox_inches="tight")
+
 
 # %% plots for talk
 # --------------------------------------------
