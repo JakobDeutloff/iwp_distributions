@@ -2,121 +2,59 @@
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
-import glob
-import re
-from dask.diagnostics import ProgressBar
 import pandas as pd
 from scipy.signal import detrend
 from scipy.stats import linregress
 from src.plot import plot_regression, plot_hists, definitions
-from src.helper_functions import nan_detrend, interpolate_bins
+from src.helper_functions import nan_detrend, interpolate_bins, load_histograms
 import pickle
 
 
 # %% initialize containers
-hists_monthly = {}
-hists_smooth = {}
-slopes_monthly = {}
-error_montly = {}
-bins = bins = np.logspace(-3, 2, 254)[::4]
-datasets = ["ccic", "2c", "dardar", "spare"]
+bins = np.logspace(-3, 2, 254)[::4]
 colors, line_labels, linestyles = definitions()
+hists = load_histograms()
 
-# %% open CCIC
-path = "/work/bm1183/m301049/ccic/"
-years = range(2000, 2024)
-months = [f"{i:02d}" for i in range(1, 13)]
-hist_list = []
-for year in years:
-    for month in months:
-        try:
-            ds = xr.open_dataset(
-                f"{path}{year}/ccic_cpcir_iwp_distribution_{year}{month}.nc"
-            )
-            hist_list.append(ds)
-        except FileNotFoundError:
-            print(f"File for {year}-{month} not found, skipping.")
+# %% find right size threshold for 2c ice and dardar
+fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True, sharey=True)
+bins_size = np.arange(0, np.max([hists["two_c_ice"]["size"].max(), hists['dardar']['size'].max()]), 1e5)
+axes[0].hist(hists["two_c_ice"]["size"], color='k', bins=bins_size)
+axes[1].hist(hists["dardar"]["size"], color='k', bins=bins_size)
+axes[0].axvline(1.9e6, color='r', linestyle='--')
+axes[1].axvline(1.9e6, color='r', linestyle='--')
 
-hists_ccic = xr.concat(hist_list, dim="time")
+for ax in axes:
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_ylabel("Number of Months")
+axes[1].set_xlabel("Sample Size")
+axes[0].set_title("2C-ICE")
+axes[1].set_title("DARDAR")
+# add letters 
+for i, ax in enumerate(axes):
+    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+fig.savefig("plots/anvil_thinning/sample_size_histograms.pdf", bbox_inches="tight")
 
-# %% open 2C-ICE
-hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
+# %% number of months below sample size threshold 
+for key in ['two_c_ice', 'dardar']:
+    num_months = (hists[key]["size"] < 1.9e6).sum().item()
+    print(f"{key}: {num_months} months below threshold, {num_months/len(hists[key]['size'])*100:.2f}% of months")
 
-# %% open dardar
-hists_dardar = (
-    xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
-    .resample(time="1ME")
-    .sum()
-)
+# %% filter 2c_ice and dadar data for size
+hists['two_c_ice'] = hists['two_c_ice'].where(hists['two_c_ice']["size"] > 1.9e6)
+hists['dardar'] = hists['dardar'].where(hists['dardar']["size"] > 1.9e6)
 
-# %% open spareice
-hists_spare = xr.open_dataset("/work/bm1183/m301049/spareice/hists_metop.nc")
-
-# %% filter 2c_ice and dadar data
-hists_2c = hists_2c.where(hists_2c["size"] > 2.2e6)
-hists_dardar = hists_dardar.where(hists_dardar["size"] > 2.2e6)
-
-# %% coarsen histograms and normalise by size
-hists_ccic_coarse = hists_ccic.coarsen(bin_center=4, boundary="trim").sum()
-
-# ccic
-hists_monthly["ccic"] = (
-    hists_ccic_coarse["hist"].resample(time="1ME").sum()
-    / hists_ccic_coarse["size"].resample(time="1ME").sum()
-)
-
-# 2c-ice
-hists_monthly["2c"] = (hists_2c["hist"] / hists_2c["size"]).sel(
-    time=slice("2006-06", "2017-12")
-)
-
-# dardar
-hists_monthly["dardar"] = (hists_dardar["hist"] / hists_dardar["size"]).sel(
-    time=slice("2006-06", "2017-12")
-)
-
-# spareice
-hists_monthly["spare"] = hists_spare["hist"] / hists_spare["size"]
-hists_monthly["spare"] = hists_monthly["spare"].transpose("bin_center", "time")
-hists_monthly["spare"] = hists_monthly["spare"].sel(time=slice(None, "2025-07"))
-
-
-# %% fix time coordinates
-for key in datasets:
-    hists_monthly[key]["time"] = pd.to_datetime(
-        hists_monthly[key]["time"].dt.strftime("%Y-%m")
-    )
+#%% normalise hists
+hists_normalized = {}
+for key in hists.keys():
+    hists_normalized[key] = hists[key]["hist"] / hists[key]["size"]
 
 # %% load era5 surface temp
-path_t2m = "/pool/data/ERA5/E5/sf/an/1M/167/"
-# List all .grb files
-files = glob.glob(path_t2m + "E5sf00_1M_*.grb")
+t_mean = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
 
-# Filter files for year > 2000
-files_after_2000 = [
-    f for f in files if int(re.search(r"_(\d{4})_", f).group(1)) >= 2000
-]
-ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords").chunk(
-    {"time": 1, "values": -1}
-)
-
-# slect tropics and calculate annual average
-with ProgressBar():
-    t_month = (
-        ds["t2m"]
-        .where((ds["latitude"] >= -30) & (ds["latitude"] <= 30))
-        .mean("values")
-        .compute()
-    )
-
-
-t_month["time"] = pd.to_datetime(t_month["time"].dt.strftime("%Y-%m"))
-t_annual = t_month.resample(time="1YE").mean("time")
-
-# %%
+# %% plot all histograms to check how they look
 plot_hists(
-    hists_monthly["dardar"].sel(time=slice("2007-05", "2025-07")),
-    t_month.sel(time=slice("2007-05", "2025-07")),
+    hists_normalized["dardar"].sel(time=slice("2007-05", "2025-07")),
+    t_mean.sel(time=slice("2007-05", "2025-07")),
     bins,
 )
 
@@ -124,140 +62,54 @@ plot_hists(
 hists_deseason = {}
 
 # temperature
-t_detrend = xr.DataArray(detrend(t_month), coords=t_month.coords, dims=t_month.dims)
+t_detrend = xr.DataArray(detrend(t_mean), coords=t_mean.coords, dims=t_mean.dims)
 t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby("time.month").mean(
     "time"
 )
 
-for ds in datasets:
-    hists_detrend = nan_detrend(hists_monthly[ds])
+for key in hists_normalized.keys():
+    hists_detrend = nan_detrend(hists_normalized[key])
     hists_deseason_ds = hists_detrend.groupby("time.month") - hists_detrend.groupby(
         "time.month"
     ).mean("time")
     hists_deseason_ds["time"] = pd.to_datetime(
         hists_deseason_ds["time"].dt.strftime("%Y-%m")
     )
-    hists_deseason[ds] = hists_deseason_ds
+    hists_deseason[key] = hists_deseason_ds
 
 # %%regression
-slopes_ccic = []
-err_ccic = []
-for ds in datasets:
+slopes_monthly = {}
+error_montly = {}
+p_vals_monthly = {}
+for key in hists_deseason.keys():
     slopes_ds = []
     err_ds = []
-    hist_vals = hists_deseason[ds].where(hists_deseason[ds].notnull(), drop=True)
+    p_vals_ds = []
+    hist_vals = hists_deseason[key].where(hists_deseason[key].notnull(), drop=True)
     temp = t_deseason.sel(time=hist_vals.time)
-    for i in range(hists_deseason[ds].bin_center.size):
-        hist_row = hist_vals.isel(bin_center=i).values
+    for i in range(hists_deseason[key].iwp.size):
+        hist_row = hist_vals.isel(iwp=i).values
         res = linregress(temp.values, hist_row)
         slopes_ds.append(res.slope)
         err_ds.append(res.stderr)
-    slopes_monthly[ds] = xr.DataArray(
+        p_vals_ds.append(res.pvalue)
+    slopes_monthly[key] = xr.DataArray(
         slopes_ds,
-        coords={"bin_center": hists_deseason[ds].bin_center},
-        dims=["bin_center"],
+        coords={"iwp": hists_deseason[key].iwp},
+        dims=["iwp"],
     )
-    error_montly[ds] = xr.DataArray(
+    error_montly[key] = xr.DataArray(
         err_ds,
-        coords={"bin_center": hists_deseason[ds].bin_center},
-        dims=["bin_center"],
+        coords={"iwp": hists_deseason[key].iwp},
+        dims=["iwp"],
     )
-# %% calculate seasonal means
-hists_season = {}
-t_season = t_detrend.groupby("time.month").mean("time")
-for key in datasets:
-    hists_season[key] = hists_monthly[key].groupby("time.month").mean(
-        "time"
-    ) - hists_monthly[key].mean("time")
-
-# %% regression seasonal means
-slopes_season = {}
-error_season = {}
-for key in datasets:
-    slopes = []
-    error = []
-    for i in range(hists_season[key].bin_center.size):
-        hist_vals = hists_season[key].isel(bin_center=i).values
-        res = linregress(t_season.values, hist_vals)
-        slopes.append(res.slope)
-        error.append(res.stderr)
-    slopes_season[key] = xr.DataArray(
-        slopes,
-        coords={"bin_center": hists_season[key].bin_center},
-        dims=["bin_center"],
+    p_vals_monthly[key] = xr.DataArray(
+        p_vals_ds,
+        coords={"iwp": hists_deseason[key].iwp},
+        dims=["iwp"],
     )
-    error_season[key] = xr.DataArray(
-        error,
-        coords={"bin_center": hists_season[key].bin_center},
-        dims=["bin_center"],
-    )
-# %% save slopes
-with open("/work/bm1183/m301049/iwp_dists/slopes_monthly.pkl", "wb") as f:
-    pickle.dump(slopes_monthly, f)
-with open("/work/bm1183/m301049/iwp_dists/error_monthly.pkl", "wb") as f:
-    pickle.dump(error_montly, f)
-with open("/work/bm1183/m301049/iwp_dists/slopes_season.pkl", "wb") as f:
-    pickle.dump(slopes_season, f)
-with open("/work/bm1183/m301049/iwp_dists/error_season.pkl", "wb") as f:
-    pickle.dump(error_season, f)
 
-# %% plot seasonal slopes
-fig, ax = plt.subplots()
-for ds in datasets:
-    ax.plot(
-        hists_season[ds].bin_center,
-        slopes_season[ds],
-        label=line_labels[ds],
-        color=colors[ds],
-    )
-    ax.fill_between(
-        hists_season[ds].bin_center,
-        slopes_season[ds] - error_season[ds],
-        slopes_season[ds] + error_season[ds],
-        color=colors[ds],
-        alpha=0.3,
-    )
-ax.axhline(0, color="k", linewidth=0.5)
-ax.set_xscale("log")
 
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=hists_deseason["ccic"].time),
-    hists_deseason["ccic"],
-    slopes_monthly["ccic"],
-    error_montly["ccic"],
-    "CCIC Monthly",
-)
-fig.savefig("plots/ccic_monthly.png", dpi=300, bbox_inches="tight")
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=hists_deseason["2c"].time),
-    hists_deseason["2c"],
-    slopes_monthly["2c"],
-    error_montly["2c"],
-    "2C-ICE Monthly",
-)
-fig.savefig("plots/2c_monthly.png", dpi=300, bbox_inches="tight")
-
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=hists_deseason["dardar"].time),
-    hists_deseason["dardar"].T,
-    slopes_monthly["dardar"],
-    error_montly["dardar"],
-    "DARDAR v3.10 Monthly",
-)
-fig.savefig("plots/dardar_monthly.png", dpi=300, bbox_inches="tight")
-
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=slice(None, "2025-07")),
-    hists_deseason["spare"].sel(time=slice(None, "2025-07")),
-    slopes_monthly["spare"],
-    error_montly["spare"],
-    "SPARE-ICE Monthly",
-)
-fig.savefig("plots/spare_monthly.png", dpi=300, bbox_inches="tight")
 
 # %% load cre data and hists from icon
 cre = xr.open_dataset(
@@ -282,152 +134,225 @@ for run in ["jed0011", "jed0022", "jed0033"]:
             dims=["iwp"],
         )
 
-
-# %% interpolate
+#  interpolate
 iwp_hists_int = {}
 for run in ["jed0011", "jed0022", "jed0033"]:
     iwp_hists_int[run] = interpolate_bins(iwp_hists[run], bins, "iwp")
 
-    # check cdf
-    print(
-        f"{run} sum original: {iwp_hists[run].sel(iwp=slice(iwp_hists_int[run]['bin_center'].min(), None)).sum().item():.3f}, sum interp: {iwp_hists_int[run].sum().item():.3f}"
-    )
-
 cre["iwp"] = np.log10(cre["iwp"])
 cre = cre.interp(
-    iwp=np.log10(hists_monthly["ccic"].bin_center), method="linear"
+    iwp=np.log10(hists["ccic"].iwp), method="linear"
 ).drop_vars("iwp")
-cre["bin_center"] = 10 ** cre["bin_center"]
+cre["iwp"] = hists["ccic"].iwp
+
+
 iwp_change_icon = {}
 temp_deltas = {"jed0022": 4, "jed0033": 2}
 for run in ["jed0022", "jed0033"]:
     iwp_change_icon[run] = (
         iwp_hists_int[run] - iwp_hists_int["jed0011"]
     ) / temp_deltas[run]
+iwp_change_icon_mean = (iwp_change_icon["jed0022"] + iwp_change_icon["jed0033"]) / 2
+slopes_monthly['icon'] = iwp_change_icon_mean
+hists_normalized['icon'] = iwp_hists_int["jed0011"]
 
 # %% load rcemip data
 ds = xr.open_dataset(
     "/work/bm1183/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
 )
 ds["fwp"] = ds["fwp"] * 1e-3
-# interpolate histogram
 rcemip_pdf = interpolate_bins(ds["f"].mean("model"), bins, "fwp")
 diff_rcemip = (rcemip_pdf.sel(SST=305) - rcemip_pdf.sel(SST=295)) / 10
+slopes_monthly['rcemip'] = diff_rcemip
+hists_normalized['rcemip'] = rcemip_pdf.sel(SST=295)
 
-# %% plot slopes
-fig, ax = plt.subplots()
+# %% calculate feedback
+feedback = {}
+for key in slopes_monthly.keys():
+    feedback[key] = slopes_monthly[key] * cre["net"].values
 
-for ds in datasets:
-    ax.plot(
-        hists_monthly[ds].bin_center,
-        slopes_monthly[ds],
-        label=line_labels[ds],
-        color=colors[ds],
+feedback['icon'] = iwp_change_icon_mean * cre["net"].values
+feedback["rcemip"] = diff_rcemip * cre["net"].values
+
+# %% partition feedback into area and opacity feedback
+feedback_area = {}
+feedback_opacity = {}
+for key in hists.keys():
+    g_cap = (slopes_monthly[key]).sum() / (hists_normalized[key].mean('time')).sum()
+    print(f"g_cap for {key}: {g_cap*100} %/K")
+    g_prime = (
+        (slopes_monthly[key]) / hists_normalized[key].mean('time')
+    ) - g_cap
+    feedback_area[key] = (cre['net']*hists_normalized[key].mean('time')).sum() * g_cap 
+    feedback_opacity[key] = (
+        g_prime * hists_normalized[key].mean('time') * cre["net"]
+    ).sum()
+
+for key in ['icon', 'rcemip']:
+    g_cap = (slopes_monthly[key]).sum() / (hists_normalized[key]).sum()
+    print(f"g_cap for {key}: {g_cap*100} %/K")
+    g_prime = (
+        (slopes_monthly[key]) / hists_normalized[key]
+    ) - g_cap
+    feedback_area[key] = (cre['net']*hists_normalized[key]).sum() * g_cap 
+    feedback_opacity[key] = (
+        g_prime * hists_normalized[key] * cre["net"]
+    ).sum()
+
+# %% plot all distributions and cre for 2016 
+fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True, height_ratios=[3, 1])
+
+axes[0].plot(
+    iwp_hists_int['jed0011'].iwp,
+    iwp_hists_int["jed0011"],
+    label=line_labels['icon'],
+    color=colors['icon'],
+    linestyle=linestyles['icon'],
+)
+axes[0].plot(
+    rcemip_pdf.iwp,
+    rcemip_pdf.sel(SST=295),
+    label=line_labels['rcemip'],
+    color=colors['rcemip'],
+    linestyle=linestyles['rcemip'],
+)
+
+for key in hists.keys():
+    axes[0].plot(
+        hists[key].iwp,
+        hists[key]['hist'].sel(time="2016").sum('time') / hists[key]['size'].sel(time="2016").sum('time'),
+        label=line_labels[key],
+        color=colors[key],
+        linestyle=linestyles[key],
     )
 
-for run in ["jed0022", "jed0033"]:
-    ax.plot(
-        iwp_change_icon[run].bin_center,
-        iwp_change_icon[run],
-        label=line_labels[run],
-        color=colors[run],
-        linestyle="--",
-    )
+axes[0].set_xscale("log")
+axes[0].set_xlim([1e-3, 2e1])
+axes[0].set_ylim(0, 0.013)
 
-ax.plot(
-    diff_rcemip.bin_center,
+axes[1].axhline(0, color="k", linewidth=0.5)
+axes[1].plot(
+    cre.iwp,
+    cre['net'],
+    color='k',
+)
+for ax in axes:
+    ax.spines[["top", "right"]].set_visible(False)
+
+axes[0].legend(frameon=False)
+axes[0].set_ylabel(r"$P(I)$")
+axes[1].set_xlabel(r"$I$ / kg m$^{-2}$")
+axes[1].set_ylabel(r"$C(I)$ / W m$^{-2}$")
+axes[1].set_yticks([-100, 0, 40])
+axes[0].set_yticks([0, 0.006, 0.012])
+
+# add letters
+for i, ax in enumerate(axes):
+    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+fig.savefig("plots/anvil_thinning/distributions_cre_2016.pdf", bbox_inches="tight")
+
+# %% plot slopes and p-value
+fig, axes = plt.subplots(2, 1,figsize=(8, 6), sharex=True, height_ratios=[3, 1])
+
+axes[0].plot(
+    iwp_change_icon_mean.iwp,
+    iwp_change_icon_mean,
+    label=line_labels['icon'],
+    color=colors['icon'],
+    linestyle="--",
+)
+
+axes[0].plot(
+    diff_rcemip.iwp,
     diff_rcemip,
     label=line_labels["rcemip"],
     color=colors["rcemip"],
     linestyle="--",
 )
-ax.axhline(0, color="k", linewidth=0.5)
-ax.set_xscale("log")
 
-ax.spines[["top", "right"]].set_visible(False)
-ax.set_ylabel("dP(I)/dT / K$^{-1}$")
-ax.set_xlabel("I / kg m$^{-2}$")
-ax.set_xlim(1e-3, 2e1)
-ax.legend()
-fig.tight_layout()
-fig.savefig("plots/slopes_monthly.png", dpi=300, bbox_inches="tight")
-
-# %% plot slopes in %/K
-fig, ax = plt.subplots()
-
-for ds in datasets:
-    ax.plot(
-        hists_monthly[ds].bin_center,
-        slopes_monthly[ds] * 100 / hists_monthly[ds].mean("time"),
-        label=line_labels[ds],
-        color=colors[ds],
+for key in hists.keys():
+    axes[0].plot(
+        slopes_monthly[key].iwp,
+        slopes_monthly[key],
+        label=line_labels[key],
+        color=colors[key],
+    )
+    axes[1].plot(
+        p_vals_monthly[key].iwp,
+        p_vals_monthly[key],
+        label=line_labels[key],
+        color=colors[key],
     )
 
-for run in ["jed0022", "jed0033"]:
-    ax.plot(
-        iwp_change_icon[run].bin_center,
-        iwp_change_icon[run] * 100 / iwp_hists_int["jed0011"],
-        label=line_labels[run],
-        color=colors[run],
-        linestyle="--",
-    )
+axes[0].axhline(0, color="k", linewidth=0.5)
+axes[0].set_xscale("log")
 
-ax.plot(
-    diff_rcemip.bin_center,
-    diff_rcemip * 100 / rcemip_pdf.sel(SST=295),
-    label=line_labels["rcemip"],
-    color=colors["rcemip"],
-    linestyle="--",
-)
+for ax in axes:
+    ax.spines[["top", "right"]].set_visible(False)  
+    ax.set_xlim(1e-3, 2e1)
 
-ax.axhline(0, color="k", linewidth=0.5)
-ax.set_xscale("log")
+axes[0].set_ylabel(r"d$P(I)$/d$T$ / K$^{-1}$")
+axes[1].set_ylabel("p-value")
+axes[1].set_xlabel(r"$I$ / kg m$^{-2}$")
+axes[0].set_yticks([-0.0006, -0.0002, 0, 0.0002])
+axes[1].set_yticks([0.05, 0.5, 1])
+axes[1].axhline(0.05, color="k", linewidth=0.5)
+handles, labels = axes[0].get_legend_handles_labels()
+fig.legend(handles, labels, frameon=False, ncol=3, bbox_to_anchor=(0.75, 0))
 
-ax.spines[["top", "right"]].set_visible(False)
-ax.set_ylabel("dP(I)/dT / % K$^{-1}$")
-ax.set_xlabel("I / kg m$^{-2}$")
-ax.set_xlim(1e-3, 2e1)
-ax.set_ylim(-15, 15)
-ax.legend()
-fig.tight_layout()
-fig.savefig("plots/slopes_monthly_perc.png", dpi=300, bbox_inches="tight")
+# add letters
+for i, ax in enumerate(axes):
+    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
 
-# %% calculate feedback
-feedback = {}
-for ds in datasets:
-    feedback[ds] = slopes_monthly[ds] * cre["net"].values
-for run in ["jed0022", "jed0033"]:
-    feedback[run] = iwp_change_icon[run] * cre["net"].values
-
-feedback["rcemip"] = diff_rcemip * cre["net"].values
-
+fig.savefig("plots/anvil_thinning/slopes_monthly.pdf", bbox_inches="tight")
 
 # %% plot feedback
-fig, axes = plt.subplots(1, 2, figsize=(12, 5), width_ratios=[3, 1])
+fig, axes = plt.subplots(1, 2, figsize=(10, 4), width_ratios=[3, 0.5])
 offsets = {
-    "jed0033": 0.1,
-    "jed0022": 0.2,
+    "icon": 0.2,
     "rcemip": 0.3,
     "ccic": 0.4,
-    "2c": 0.5,
+    "two_c_ice": 0.5,
     "dardar": 0.6,
-    "spare": 0.7,
+    "spare_ice": 0.7,
+}
+markers = {
+    "icon": "x",
+    "rcemip": "x",
+    "ccic": "o",
+    "two_c_ice": "o",
+    "dardar": "o",
+    "spare_ice": "o",
 }
 
-members = datasets + ["rcemip"] + ["jed0022", "jed0033"]
-for ds in members:
+members = offsets.keys()
+for key in members:
     axes[0].plot(
-        hists_monthly["ccic"].bin_center,
-        feedback[ds],
-        label=line_labels[ds],
-        color=colors[ds],
-        linestyle=linestyles[ds],
+        feedback[key].iwp,
+        feedback[key],
+        label=line_labels[key],
+        color=colors[key],
+        linestyle=linestyles[key],
     )
 
     axes[1].scatter(
-        offsets[ds],
-        feedback[ds].sum().item(),
-        color=colors[ds],
+        0,
+        feedback[key].sum().item(),
+        color=colors[key],
+        marker=markers[key],
+        label=line_labels[key],
+    )
+    axes[1].scatter(
+        1,
+        feedback_area[key].item(),
+        color=colors[key],
+        marker=markers[key],
+    )
+    axes[1].scatter(
+        2,
+        feedback_opacity[key].item(),
+        color=colors[key],
+        marker=markers[key],
     )
 
 for ax in axes:
@@ -437,48 +362,67 @@ for ax in axes:
 
 axes[0].set_xscale("log")
 axes[0].set_xlim(1e-3, 2e1)
-axes[0].set_ylabel("$F_{\mathrm{IWP}}(I)$ / W m$^{-2}$ K$^{-1}$")
-axes[0].set_xlabel("I / kg m$^{-2}$")
-axes[0].legend()
-axes[1].set_xticks(list(offsets.values()))
-labels = [line_labels[ds] for ds in list(offsets.keys())]
-axes[1].set_xticklabels(labels, rotation=45, ha="right")
-axes[1].set_ylabel("$F_{\mathrm{IWP}}$ / W m$^{-2}$ K$^{-1}$")
+axes[0].set_ylabel(r"$\lambda(I)$ / W m$^{-2}$ K$^{-1}$")
+axes[0].set_xlabel(r"$I$ / kg m$^{-2}$")
+axes[0].legend(frameon=False, loc="upper left")
+axes[0].set_yticks([-0.02, 0, 0.02])
+
+axes[1].set_xticks([0, 1, 2])
+axes[1].set_xlim(-0.5, 2.5)
+axes[1].set_xticklabels(["Total", "Area", "Opacity"], rotation=45)
+axes[1].set_ylabel(r"$\lambda$ / W m$^{-2}$ K$^{-1}$")
+axes[1].set_yticks([-0.05, 0, 0.05, 0.15])
+
+handles, labels = axes[1].get_legend_handles_labels()
+fig.legend(handles, labels, frameon=False, ncol=1, bbox_to_anchor=(1.1, 0.98))
+
+# add letters
+for i, ax in enumerate(axes):
+    ax.text(0.03, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+
 fig.tight_layout()
-fig.savefig("plots/feedback_monthly.png", dpi=300, bbox_inches="tight")
+fig.savefig("plots/anvil_thinning/feedback_monthly.pdf", bbox_inches="tight")
 
+# %% calculate mean and std of feedback 
+mean_feedback = np.mean([feedback[key].sum().item()/2 for key in ['ccic', 'spare_ice', 'two_c_ice', 'dardar']])
+std_feedback = np.std([feedback[key].sum().item()/2 for key in ['ccic', 'spare_ice', 'two_c_ice', 'dardar']])
+print(f"Mean feedback: {mean_feedback:.4f} W m^-2 K^-1")
+print(f"Std feedback: {std_feedback:.4f} W m^-2 K^-1")
+# %%
+fig, axes = plot_regression(
+    t_deseason.sel(time=hists_deseason["ccic"].time),
+    hists_deseason["ccic"].T,
+    slopes_monthly["ccic"],
+    error_montly["ccic"],
+    "CCIC Monthly",
+)
+fig.savefig("plots/anvil_thinning/ccic_monthly.png", dpi=300, bbox_inches="tight")
+# %%
+fig, axes = plot_regression(
+    t_deseason.sel(time=hists_deseason["two_c_ice"].time),
+    hists_deseason["two_c_ice"].T,
+    slopes_monthly["two_c_ice"],
+    error_montly["two_c_ice"],
+    "2C-ICE Monthly",
+)
+fig.savefig("plots/anvil_thinning/2c_monthly.png", dpi=300, bbox_inches="tight")
 
 # %%
-fig, ax = plt.subplots()
-
-ax.plot(
-    hists_monthly["ccic"].bin_center,
-    slopes_monthly["ccic"] * 100 / hists_monthly["ccic"].mean("time"),
-    label="CCIC",
+fig, axes = plot_regression(
+    t_deseason.sel(time=hists_deseason["dardar"].time),
+    hists_deseason["dardar"].T,
+    slopes_monthly["dardar"],
+    error_montly["dardar"],
+    "DARDAR v3.10 Monthly",
 )
-ax.plot(
-    hists_monthly["2c"].bin_center,
-    slopes_monthly["2c"] * 100 / hists_monthly["2c"].mean("time"),
-    label="2C-ICE",
-)
-ax.plot(
-    hists_monthly["dardar"].bin_center,
-    slopes_monthly["dardar"] * 100 / hists_monthly["dardar"].mean("time"),
-    label="DARDAR v3.10",
-)
-for run in ["jed0022", "jed0033"]:
-    ax.plot(
-        iwp_change_icon[run].iwp,
-        iwp_change_icon[run] / iwp_hists["jed0011"] * 100,
-        label=f"ICON {experiments[run]}",
-        linestyle="--",
-    )
+fig.savefig("plots/anvil_thinning/dardar_monthly.png", dpi=300, bbox_inches="tight")
 
-
-ax.axhline(0, color="k", linewidth=0.5)
-ax.set_xscale("log")
-
-ax.spines[["top", "right"]].set_visible(False)
-ax.set_ylim(-10, 10)
-ax.legend()
 # %%
+fig, axes = plot_regression(
+    t_deseason.sel(time=slice(None, "2025-07")),
+    hists_deseason["spare_ice"].T,
+    slopes_monthly["spare_ice"],
+    error_montly["spare_ice"],
+    "SPARE-ICE Monthly",
+)
+fig.savefig("plots/anvil_thinning/spare_monthly.png", dpi=300, bbox_inches="tight")

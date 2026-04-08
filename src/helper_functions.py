@@ -1,9 +1,10 @@
 from matplotlib.pyplot import hist
 import numpy as np
-import xarray as xr 
+import xarray as xr
 from scipy.signal import detrend
 import pandas as pd
 from scipy.stats import linregress
+
 
 def nan_detrend_along_time(da):
     arr = da.values
@@ -17,19 +18,19 @@ def nan_detrend_along_time(da):
             out[i, mask] = y_detrended
     return xr.DataArray(out, coords=da.coords, dims=da.dims)
 
-def nan_detrend(da, dim='bin_center'):
+
+def nan_detrend(da, dim="iwp"):
     out = xr.zeros_like(da)
     for i in da[dim]:
         y = da.sel({dim: i}).values
         mask = np.isfinite(y)
         if np.sum(mask) > 1:
             x = np.arange(len(y))
-            # fit linear trend 
+            # fit linear trend
             slope, intercept = np.polyfit(x[mask], y[mask], 1)
             trend = slope * x + intercept
             out.loc[{dim: i}] = y - trend
     return out
-
 
 
 def interpolate_bins(hist, new_bins, name_old_bins):
@@ -43,15 +44,16 @@ def interpolate_bins(hist, new_bins, name_old_bins):
     xr.DataArray: The interpolated histogram on the new bins.
     """
     cdf = hist.cumsum(name_old_bins)
-    cdf[name_old_bins] = np.log10(cdf[name_old_bins])
+    cdf[name_old_bins] = np.log10(hist[name_old_bins])
     cdf_int = cdf.interp({name_old_bins: np.log10(new_bins)}).rename(
-        {name_old_bins: "bin_center"}
+        {name_old_bins: "iwp"}
     )
-    pdf_int = cdf_int.diff("bin_center")
-    pdf_int["bin_center"] = 10 ** pdf_int["bin_center"]
+    pdf_int = cdf_int.diff("iwp")
+    pdf_int["iwp"] = (new_bins[1:] + new_bins[:-1]) / 2
     return pdf_int
 
-def shift_longitudes(ds, lon_name='longitude'):
+
+def shift_longitudes(ds, lon_name="longitude"):
     """Shift longitudes from [-180, 180] to [0, 360]"""
     lon_shifted = ds[lon_name].values.copy()
     lon_shifted[ds[lon_name].values < 0] += 360.0
@@ -62,6 +64,7 @@ def shift_longitudes(ds, lon_name='longitude'):
         ds[lon_name].values = lon_shifted
     return ds
 
+
 def read_ccic_dc(filename):
     path = "/work/bm1183/m301049/ccic_daily_cycle/"
     years = range(2000, 2024)
@@ -70,15 +73,14 @@ def read_ccic_dc(filename):
     for year in years:
         for month in months:
             try:
-                ds = xr.open_dataset(
-                    f"{path}{year}/{filename}{year}{month}.nc"
-                )
+                ds = xr.open_dataset(f"{path}{year}/{filename}{year}{month}.nc")
                 hist_list.append(ds)
             except FileNotFoundError:
                 print(f"File for {year}-{month} not found, skipping.")
 
     hists_ccic = xr.concat(hist_list, dim="time")
     return hists_ccic
+
 
 def resample_histograms(hist):
     hist_monthly = hist.resample(time="1ME").sum()
@@ -88,6 +90,7 @@ def resample_histograms(hist):
         hist_monthly = hist_monthly.transpose("local_time", "time")
     return hist_monthly
 
+
 def normalise_histograms(hist):
     hist = hist["hist"] / hist["hist"].sum("local_time")
     if len(hist.dims) == 2:
@@ -96,11 +99,10 @@ def normalise_histograms(hist):
 
 
 def deseason(ts):
-    ts_deseason = ts.groupby("time.month") - ts.groupby("time.month").mean(
-        "time"
-    )
+    ts_deseason = ts.groupby("time.month") - ts.groupby("time.month").mean("time")
     ts_deseason["time"] = pd.to_datetime(ts_deseason["time"].dt.strftime("%Y-%m"))
     return ts_deseason
+
 
 def regress_hist_temp_1d(cf_detrend, temp, cf):
     slopes = []
@@ -122,10 +124,11 @@ def regress_hist_temp_1d(cf_detrend, temp, cf):
         coords={"local_time": cf_dummy.local_time},
         dims=["local_time"],
     )
-    mean_cf = cf.mean('time')
+    mean_cf = cf.mean("time")
     slopes_perc = slopes_da * 100 / mean_cf
     err_perc = err_da * 100 / mean_cf
     return slopes_perc, err_perc
+
 
 def detrend_hist_2d(hist):
 
@@ -138,6 +141,7 @@ def detrend_hist_2d(hist):
         hist_detrend = nan_detrend(hist.sel({detrend_dim: i}), dim="local_time")
         out.loc[{detrend_dim: i}] = hist_detrend
     return out
+
 
 def regress_hist_temp_2d(cf_detrend, temp, cf):
     if "bt" in cf_detrend.dims:
@@ -158,9 +162,10 @@ def regress_hist_temp_2d(cf_detrend, temp, cf):
             slopes.loc[{"local_time": i, detrend_dim: j}] = slope
             p_values.loc[{"local_time": i, detrend_dim: j}] = p_value
 
-    mean_hist = cf.mean('time')
+    mean_hist = cf.mean("time")
     slopes_perc = slopes * 100 / mean_hist
     return slopes_perc, p_values
+
 
 def lowpass_filter(da, cutoff_period_years=3):
     """
@@ -210,34 +215,86 @@ def lowpass_filter(da, cutoff_period_years=3):
     # Create output DataArray with same coordinates
     return xr.DataArray(filtered_data, coords=da.coords, dims=da.dims)
 
-def read_era5_vars(mode='all'):
-    
-    if mode == 'all':
+
+def read_era5_vars(mode="all"):
+
+    if mode == "all":
         path = "/work/bm1183/m301049/era5/monthly"
-        vars = ['t', 'p', 'rad_tendency', 'stability', 'subsidence', 'convergence']
-        dataarrays = [xr.open_dataarray(f"{path}/{var}.nc", chunks={}, decode_timedelta=False) for var in vars]
-        dataarrays_uni = [da.assign_coords(time=dataarrays[0]['time']) for da in dataarrays]
-        ds_merged = xr.merge(dataarrays_uni, compat='override')
+        vars = ["t", "p", "rad_tendency", "stability", "subsidence", "convergence"]
+        dataarrays = [
+            xr.open_dataarray(f"{path}/{var}.nc", chunks={}, decode_timedelta=False)
+            for var in vars
+        ]
+        dataarrays_uni = [
+            da.assign_coords(time=dataarrays[0]["time"]) for da in dataarrays
+        ]
+        ds_merged = xr.merge(dataarrays_uni, compat="override")
     else:
         path = "/work/bm1183/m301049/era5/monthly/averages"
-        vars = ['t', 'p', 'rad', 'stability', 'subsidence', 'convergence']
-        dataarrays = [xr.open_dataarray(f"{path}/{var}_mean.nc", chunks={}, decode_timedelta=False) for var in vars]
-        dataarrays_uni = [da.assign_coords(time=dataarrays[0]['time']) for da in dataarrays]
-        ds_merged = xr.merge(dataarrays_uni, compat='override')
+        vars = ["t", "p", "rad", "stability", "subsidence", "convergence"]
+        dataarrays = [
+            xr.open_dataarray(
+                f"{path}/{var}_mean.nc", chunks={}, decode_timedelta=False
+            )
+            for var in vars
+        ]
+        dataarrays_uni = [
+            da.assign_coords(time=dataarrays[0]["time"]) for da in dataarrays
+        ]
+        ds_merged = xr.merge(dataarrays_uni, compat="override")
     return ds_merged
 
+
 def calculate_jj_mean(ds):
-    ds_spring = ds.sel(time=ds['time.month']<7).groupby('time.year').mean(dim='time')
+    ds_spring = ds.sel(time=ds["time.month"] < 7).groupby("time.year").mean(dim="time")
     ds_spring = ds_spring.isel(year=slice(1, None))  # remove first year
-    ds_spring['year'] = ds_spring['year'] - 1  # shift year to starting year of july-june period
-    ds_fall = ds.sel(time=ds['time.month']>=7).groupby('time.year').mean(dim='time')
-    ds_jj = xr.concat([ds_spring, ds_fall], dim='year').sortby('year').groupby('year').mean(dim='year')
+    ds_spring["year"] = (
+        ds_spring["year"] - 1
+    )  # shift year to starting year of july-june period
+    ds_fall = ds.sel(time=ds["time.month"] >= 7).groupby("time.year").mean(dim="time")
+    ds_jj = (
+        xr.concat([ds_spring, ds_fall], dim="year")
+        .sortby("year")
+        .groupby("year")
+        .mean(dim="year")
+    )
     return ds_jj
 
+
 def calculate_jj_sum(hist):
-    hist_spring = hist.sel(time=hist['time.month']<7).groupby('time.year').sum(dim='time')
+    hist_spring = (
+        hist.sel(time=hist["time.month"] < 7).groupby("time.year").sum(dim="time")
+    )
     hist_spring = hist_spring.isel(year=slice(1, None))  # remove first year
-    hist_spring['year'] = hist_spring['year'] - 1  # shift year to starting year of july-june period
-    hist_fall = hist.sel(time=hist['time.month']>=7).groupby('time.year').sum(dim='time')
-    hist_jj = xr.concat([hist_spring, hist_fall], dim='year').sortby('year').groupby('year').sum(dim='year')
+    hist_spring["year"] = (
+        hist_spring["year"] - 1
+    )  # shift year to starting year of july-june period
+    hist_fall = (
+        hist.sel(time=hist["time.month"] >= 7).groupby("time.year").sum(dim="time")
+    )
+    hist_jj = (
+        xr.concat([hist_spring, hist_fall], dim="year")
+        .sortby("year")
+        .groupby("year")
+        .sum(dim="year")
+    )
     return hist_jj
+
+
+def load_histograms(freq="1ME"):
+    hists = {}
+    hists["ccic"] = xr.open_dataset(
+        "/work/bm1183/m301049/ccic/hists/ccic_monthly_hist_interpolated.nc"
+    )
+    hists["two_c_ice"] = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists_no_dup.nc")
+    hists["dardar"] = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
+    hists["spare_ice"] = xr.open_dataset(
+        "/work/bm1183/m301049/spareice/hists_metop.nc"
+    ).sel(time=slice(None, "2025-07"))
+    for key in hists.keys():
+        hists[key] = hists[key].resample(time=freq).sum()
+        if "bin_center" in hists[key].dims:
+            hists[key] = hists[key].rename({"bin_center": "iwp"})
+        hists[key] = hists[key].transpose("time", "iwp")
+        hists[key]["time"] = pd.to_datetime(hists[key]["time"].dt.strftime("%Y-%m"))
+    return hists

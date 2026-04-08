@@ -18,7 +18,7 @@ def plot_regression(temp, hists, slopes, error, title):
 
     # iwp anomalies
     im = axes[0, 1].pcolormesh(
-        hists.bin_center,
+        hists.iwp,
         hists.time,
         (hists - hists.mean("time")).T,
         cmap="seismic",
@@ -32,9 +32,9 @@ def plot_regression(temp, hists, slopes, error, title):
     axes[0, 1].set_yticklabels([])
 
     # slopes
-    axes[1, 1].plot(hists.bin_center, slopes, color="k", label="CCIC")
+    axes[1, 1].plot(hists.iwp, slopes, color="k", label="CCIC")
     axes[1, 1].fill_between(
-        hists.bin_center,
+        hists.iwp,
         slopes - error,
         slopes + error,
         color="gray",
@@ -90,36 +90,30 @@ def plot_hists(hists, temp, bins):
 def definitions():
 
     colors = {
-        "jed0011": "#462d7b",
-        "jed0022": "#c1df24",
-        "jed0033": "#1f948a",
+        "icon": "#1f948a",
         "rcemip": "#ff7f0e",
         "dardar": "brown",
-        "2c": "k",
+        "two_c_ice": "k",
         "ccic": "purple",
-        "spare": "darkgreen",
+        "spare_ice": "darkgreen",
     }
 
     labels = {
-        "jed0011": "ICON Control",
-        "jed0022": "ICON +4 K",
-        "jed0033": "ICON +2 K",
+        "icon": "ICON AP",
         "rcemip": "RCEMIP",
         "dardar": "DARDAR",
-        "2c": "2C-ICE",
+        "two_c_ice": "2C-ICE",
         "ccic": "CCIC",
-        "spare": "SPARE-ICE",
+        "spare_ice": "SPARE-ICE",
     }
 
     linestyles = {
-        "jed0011": "--",
-        "jed0022": "--",
-        "jed0033": "--",
+        "icon": "--",
         "rcemip": "--",
         "dardar": "-",
-        "2c": "-",
+        "two_c_ice": "-",
         "ccic": "-",
-        "spare": "-",
+        "spare_ice": "-",
     }
 
     return colors, labels, linestyles

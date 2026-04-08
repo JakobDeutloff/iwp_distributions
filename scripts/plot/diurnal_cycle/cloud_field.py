@@ -206,7 +206,7 @@ fig.savefig("plots/diurnal_cycle/talk/bt_iwp_cont.png", dpi=300)
 # %% fine grained vs coarse grained 
 bts_coarse = bts.coarsen(lat=26, lon=26, boundary="trim").mean()
 white_cmap = LinearSegmentedColormap.from_list("white", [(1, 1, 1), (0, 0, 0)])
-fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+fig, axes = plt.subplots(1, 2, figsize=(10, 6))
 im_fine = axes[0].pcolormesh(
     bts["lon"].sel(lon=lon_range),
     bts["lat"].sel(lat=lat_range),
@@ -230,6 +230,7 @@ for ax in axes:
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xlabel("Longitude / °E")
 axes[0].set_ylabel("Latitude / °N")
-fig.savefig("plots/diurnal_cycle/talk/bt_fine_coarse.png", dpi=300)
+fig.colorbar(im_fine, ax=axes, label="$T_{b}$ / K", orientation="horizontal", extend="both", pad=0.13, aspect=40)
+fig.savefig("plots/diurnal_cycle/talk/bt_fine_coarse.pdf", bbox_inches="tight")
 
 # %%

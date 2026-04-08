@@ -24,7 +24,7 @@ hists_gpm["sea"] = xr.open_mfdataset(
     "/work/bm1183/m301049/GPM_MERGIR/hists/gpm_extratropics_2d_hist_sea*.nc"
 ).load()
 hists_gpm["land"] = hists_gpm["all"] - hists_gpm["sea"]
-# %% coarsen hists 
+# %% coarsen hists
 hists_ccic_coarse = {}
 hists_gpm_coarse = {}
 for name in names:
@@ -36,17 +36,19 @@ hists_ccic_monthly = {}
 hists_gpm_monthly = {}
 for name in names:
     hists_ccic_monthly[name] = hists_ccic_coarse[name].resample(time="1ME").sum()
-    hists_ccic_monthly[name]['time'] = pd.to_datetime(hists_ccic_monthly[name]["time"].dt.strftime("%Y-%m"))
+    hists_ccic_monthly[name]["time"] = pd.to_datetime(
+        hists_ccic_monthly[name]["time"].dt.strftime("%Y-%m")
+    )
     hists_gpm_monthly[name] = hists_gpm_coarse[name].resample(time="1ME").sum()
-    hists_gpm_monthly[name]['time'] = pd.to_datetime(hists_gpm_monthly[name]["time"].dt.strftime("%Y-%m"))
+    hists_gpm_monthly[name]["time"] = pd.to_datetime(
+        hists_gpm_monthly[name]["time"].dt.strftime("%Y-%m")
+    )
 
 # %% save processed data
 for name in names:
-    # hists_ccic_monthly[name].to_netcdf(
-    #     f"/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_{name}.nc"
-    # )
+    hists_ccic_monthly[name].to_netcdf(
+        f"/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_{name}.nc"
+    )
     hists_gpm_monthly[name].to_netcdf(
         f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_extratropics_2d_monthly_{name}.nc"
     )
-
-# %%

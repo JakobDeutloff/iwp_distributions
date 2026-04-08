@@ -2,7 +2,7 @@
 import xarray as xr
 import numpy as np
 import pandas as pd
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 from src.helper_functions import shift_longitudes
 
@@ -58,20 +58,21 @@ mask = xr.open_dataarray('/work/bm1183/m301049/orcestra/sea_land_mask.nc').pipe(
 
 def calc_histogram(timestamp):
 
+    ds = cloudsat_xr.sel(time=timestamp)
+
+    # drop duplicates 
+    ds = ds.drop_duplicates(dim='time')
 
     # check if any data available
-    if not np.any(cloudsat_xr.sel(time=timestamp)["iwp"].values):
+    if not np.any(ds["iwp"].values):
         return (np.ones(len(bins) - 1)*np.nan, np.nan)
     
 
-    mask_daytime = (cloudsat_xr.sel(time=timestamp)["local_time"] >= 6) & (
-        cloudsat_xr.sel(time=timestamp)["local_time"] <= 18
+    mask_daytime = (ds["local_time"] >= 6) & (
+        ds["local_time"] <= 18
     )
-    # mask_geo = (cloudsat_xr.sel(time=timestamp)["lon"] >= lon_min_twp) & (
-    #     cloudsat_xr.sel(time=timestamp)["lon"] <= lon_max_twp
-    # )
-    mask_sea = mask.sel(lon=cloudsat_xr.sel(time=timestamp)["lon"], lat=cloudsat_xr.sel(time=timestamp)["lat"], method='nearest')
-    data = cloudsat_xr.sel(time=timestamp)["iwp"].where(mask_daytime & mask_sea)
+    #mask_sea = mask.sel(lon=ds["lon"], lat=ds["lat"], method='nearest')
+    data = ds["iwp"].where(mask_daytime)
     len_data = np.isfinite(data).sum()
     hist, _ = np.histogram(data, bins=bins, density=False)
     return (hist, len_data)
@@ -102,7 +103,7 @@ hists = xr.Dataset(
 )
 
 # %% save hists 
-path = '/work/bm1183/m301049/cloudsat/dists_sea.nc'
+path = '/work/bm1183/m301049/cloudsat/dists_no_dup.nc'
 hists.to_netcdf(path)
 
 # %%
