@@ -60,6 +60,9 @@ base_path = "/work/um0878/users/mbrath/SPARE-ICE-Project/results/gridded_data/"
 years = [str(i) for i in range(2007, 2026)]
 satellites = {year: "metopb" if int(year) >= 2020 else "metopa" for year in years}
 
+# %%
+process_year('2020')
+# %%
 with ProcessPoolExecutor(max_workers=19) as executor:
     # Use tqdm to show progress
     tqdm.pandas(desc="Processing years")

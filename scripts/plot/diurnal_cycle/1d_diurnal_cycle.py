@@ -339,9 +339,105 @@ ax.set_xticks([6, 12, 18])
 ax.legend(frameon=False)
 fig.savefig("plots/diurnal_cycle/publication/diurnal_cycle_change_all_nonnormalised.pdf", bbox_inches="tight")
 
+# %% plot for thesis
+hist_icon_control = (
+    xr.open_dataset(
+        "/work/bm1183/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
+    )
+    .coarsen(iwp=4, boundary="trim")
+    .sum()
+)
+cf_icon = (
+    hist_icon_control["hist"].sel(iwp=slice(1, None)).sum("iwp")
+    / hist_icon_control["size"]
+)
 
-# %% plots for talk
-# --------------------------------------------
+color = {
+    'land': "#9B6A01",
+    'sea': "#3d9ef8",
+}
+fig, axes = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
+axes[1].axhline(0, color="black", linewidth=0.7)
+# plot diurnal cycle CCIC and ICON 
+for name in ["land", "sea"]:
+    axes[0].plot(
+        cf_ccic[name].local_time,
+        cf_ccic[name].mean("time") / cf_ccic[name].mean(),
+        color=color[name],
+        linestyle="-",
+        label=f"CCIC {name}",
+    )
+axes[0].plot(
+    cf_icon.local_time,
+    cf_icon.mean("time") / cf_icon.mean(),
+    color="#462d7b",
+    linestyle="--",
+    label="ICON",
+)
+# plot change of diurnal cycle
+for name in ["land", "sea"]:
+    axes[1].plot(
+        slopes_ccic[name].local_time,
+        slopes_ccic[name],
+        color=color[name],
+        label=f"CCIC {name}",
+    )
+    axes[1].fill_between(
+        slopes_ccic[name].local_time,
+        slopes_ccic[name] - err_ccic[name],
+        slopes_ccic[name] + err_ccic[name],
+        color=color[name],
+        alpha=0.3,
+    )
+axes[1].plot(
+    slopes_ccic[name].local_time,
+    slopes_icon["jed0022"],
+    color="#c1df24",
+    label="ICON +4K",
+    linestyle="--",
+)
+axes[1].plot(
+    slopes_ccic[name].local_time,
+    slopes_icon['jed0033'],
+    color="#1f948a",
+    label="ICON +2K",
+    linestyle="--",
+)
+axes[0].set_ylabel("$\overline{f_{\mathrm{d}}}$")
+axes[1].set_ylabel(
+    r"$\dfrac{\mathrm{d}f_{\mathrm{d}}}{f_{\mathrm{d}}~\mathrm{d}T}$ / % K$^{-1}$"
+)
+axes[0].set_yticks([0.6, 1, 1.4])
+axes[1].set_yticks([-4, 0, 4])
+axes[1].set_xlabel("Local Time / h")
+labels = ['CCIC Land', 'CCIC Ocean', 'ICON Control', 'ICON +2K', 'ICON +4K']
+handles = [
+    plt.Line2D([0], [0], color=color['land'], linestyle="-"),
+    plt.Line2D([0], [0], color=color['sea'], linestyle="-"),
+    plt.Line2D([0], [0], color="#462d7b", linestyle="--"),
+    plt.Line2D([0], [0], color="#1f948a", linestyle="--"),
+    plt.Line2D([0], [0], color="#c1df24", linestyle="--"),
+]
+fig.legend(handles, labels, frameon=False, ncols=1, bbox_to_anchor=(1.2, 0.6))
+for ax in axes:
+    ax.set_xlim([0, 24])
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_xticks([6, 12, 18])
+
+# add letters
+for i, ax in enumerate(axes.flatten()):
+    ax.text(
+        0.02,
+        1,
+        chr(97 + i),
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+    )
+
+fig.savefig("plots/thesis/diurnal_cycle.pdf", bbox_inches="tight", dpi=400)
+
+# %% plots for talk --------------------------------------------
 hist_icon_control = (
     xr.open_dataset(
         "/work/bm1183/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
