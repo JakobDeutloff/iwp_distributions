@@ -83,10 +83,10 @@ ds_bottom['convergence'] = mean_convergence - diff_convergence * factor
 # %% plot mean profiles for top and bottom 10 %
 color_warm = "#cd000e"
 color_cold = "#1f6dff"
-fig, axes = plt.subplots(1, 4, figsize=(10, 5), sharey=True)
+fig, axes = plt.subplots(1, 4, figsize=(8, 4), sharey=True)
 axes[0].plot(ds_top['net_rad_tendency'], ds_top['pressure']/100, color=color_warm,)
 axes[0].plot(ds_bottom['net_rad_tendency'], ds_bottom['pressure']/100, color=color_cold,)
-axes[0].set_xlabel('$R$ / K day$^{-1}$')
+axes[0].set_xlabel('$Q$ / K day$^{-1}$')
 axes[0].set_xlim(-0.5, 1.7)   
 
 axes[1].plot(ds_top['stability']*100, ds_top['pressure']/100, color=color_warm)
@@ -101,20 +101,24 @@ axes[2].set_xlim(-5, 30)
 
 axes[3].plot(ds_top['convergence'], ds_top['pressure']/100, color=color_warm)
 axes[3].plot(ds_bottom['convergence'], ds_bottom['pressure']/100, color=color_cold)
-axes[3].set_xlabel(r'$-\dfrac{\partial \omega}{\partial P}$ / day$^{-1}$')
+axes[3].set_xlabel(r'$\dfrac{\partial \omega}{\partial P}$ / day$^{-1}$')
 axes[3].set_xlim(-0.1, 0.5)
 
 axes[0].invert_yaxis()
-axes[0].set_ylim(400, 100)
+axes[0].set_ylim(300, 100)
 axes[0].set_ylabel('$P$ / hPa') 
 axes[0].set_yticks([300, 200, 100])   
 for ax in axes:
     ax.spines[['top', 'right']].set_visible(False)
 
+# add letters
+for i, ax in enumerate(axes):
+    ax.text(0.1, 1.05, chr(97 + i), transform=ax.transAxes, fontsize=12, fontweight='bold', va='top', ha='right')
+
 handles = [plt.Line2D([0], [0], color=color_warm), plt.Line2D([0], [0], color=color_cold)]
 labels = ['Warm', 'Cold']
 fig.legend(handles, labels, bbox_to_anchor=(0.5, -0.1), loc='lower center', ncol=2, frameon=False)
-fig.savefig('plots/anvil_thinning/iris/stability_profiles_top_bottom.png', dpi=300, bbox_inches='tight')
+fig.savefig('plots/thesis/stability_profiles_top_bottom.png', dpi=300, bbox_inches='tight')
 
 # %% calculate weighted mean of temperture with detrainment
 t_warm = ds_top_raw['t'].sel(hybrid=slice(60, 90)).weighted(ds_top_raw['convergence'].sel(hybrid=slice(60, 90))).mean(dim='hybrid')

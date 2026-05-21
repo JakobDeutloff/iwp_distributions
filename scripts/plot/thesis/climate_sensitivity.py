@@ -163,7 +163,7 @@ ax.errorbar(
 ax.axvline(0, color="k", linewidth=0.5)
 ax.spines[["top", "right", "left"]].set_visible(False)
 ax.set_yticks([0, -1, -2])
-ax.set_yticklabels(["High-Cloud Altitude", "Tropical Anvil Amount", "Total"])
+ax.set_yticklabels(["High-Cloud Altitude", "Anvil-Cloud Amount", "Total"])
 ax.get_yticklabels()[-1].set_weight("bold")
 ax.set_xlabel(r"$\lambda_{\mathrm{hc}}$ / W m$^{-2}$ K$^{-1}$")
 fig.savefig("plots/thesis/feedback_estimates_sherwood.pdf", bbox_inches="tight")
@@ -294,7 +294,7 @@ ax.axvline(0, color="k", linewidth=0.7)
 ax.spines[["top", "right", "left"]].set_visible(False)
 ax.set_yticks([-0.2, -1.2, -2.2, -3.1])
 ax.set_yticklabels(
-    ["High-Cloud Altitude", "Tropical Anvil Amount", "Tropical Diurnal Cycle", "Total"]
+    ["High-Cloud Altitude", "Anvil-Cloud Amount", "Diurnal Cycle", "Total"]
 )
 ax.tick_params(axis="y", length=0)
 ax.axhline(-0.7, color="grey", linewidth=0.5, linestyle="--")
@@ -307,8 +307,8 @@ ax.set_xlabel(r"$\lambda_{\mathrm{hc}}$ / W m$^{-2}$ K$^{-1}$")
 
 # make legend
 handles = [
-    plt.Line2D([0], [0], marker="d", color=colors["sherwood"], label="Sherwood et al. (2020)", linestyle="-"),
-    plt.Line2D([0], [0], marker="d", color=colors["deutloff"], label="Deutloff et al.", linestyle="-"),
+    plt.Line2D([0], [0], marker="d", color=colors["sherwood"], label="WCRP", linestyle="-"),
+    plt.Line2D([0], [0], marker="d", color=colors["deutloff"], label="New Best Estimate", linestyle="-"),
     plt.Line2D([0], [0], marker="x", color=colors["+2K"], label="ICON + 2K", linestyle=""),
     plt.Line2D([0], [0], marker="x", color=colors["+4K"], label="ICON + 4K", linestyle=""),
     plt.Line2D([0], [0], marker="x", color=colors["rcemip"], label="RCEMIP", linestyle=""),

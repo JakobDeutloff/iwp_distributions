@@ -96,6 +96,7 @@ def definitions():
         "two_c_ice": "k",
         "ccic": "purple",
         "spare_ice": "darkgreen",
+        "xshield": "#FB06BA",
     }
 
     labels = {
@@ -105,6 +106,7 @@ def definitions():
         "two_c_ice": "2C-ICE",
         "ccic": "CCIC",
         "spare_ice": "SPARE-ICE",
+        "xshield": "X-SHiELD",
     }
 
     linestyles = {
@@ -114,6 +116,7 @@ def definitions():
         "two_c_ice": "-",
         "ccic": "-",
         "spare_ice": "-",
+        "xshield": "--",
     }
 
     return colors, labels, linestyles

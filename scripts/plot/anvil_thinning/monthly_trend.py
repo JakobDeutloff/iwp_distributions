@@ -170,13 +170,18 @@ diff_rcemip = (rcemip_pdf.sel(SST=305) - rcemip_pdf.sel(SST=295)) / 10
 slopes_monthly['rcemip'] = diff_rcemip
 hists_normalized['rcemip'] = rcemip_pdf.sel(SST=295)
 
+# %% load xshield data 
+xshield_cont = xr.open_dataset("/work/bm1183/m301049/xshield/xshield24v2_iw_histogram.nc")
+xshield_4k = xr.open_dataset("/work/bm1183/m301049/xshield/xshield24v2_PLUS_4K_iw_histogram.nc")
+diff_xshield = (xshield_4k - xshield_cont) / 4
+slopes_monthly['xshield'] = diff_xshield['f']
+hists_normalized['xshield'] = xshield_cont['f']
+
+
 # %% calculate feedback
 feedback = {}
 for key in slopes_monthly.keys():
     feedback[key] = slopes_monthly[key] * cre["net"].values
-
-feedback['icon'] = iwp_change_icon_mean * cre["net"].values
-feedback["rcemip"] = diff_rcemip * cre["net"].values
 
 # %% partition feedback into area and opacity feedback
 feedback_area = {}
@@ -192,15 +197,15 @@ for key in hists.keys():
         g_prime * hists_normalized[key].mean('time') * cre["net"]
     ).sum()
 
-for key in ['icon', 'rcemip', 'icon_2K', 'icon_4K']:
+for key in ['icon', 'rcemip', 'icon_2K', 'icon_4K', 'xshield']:
     g_cap = (slopes_monthly[key]).sum() / (hists_normalized[key]).sum()
     print(f"g_cap for {key}: {g_cap*100} %/K")
     g_prime = (
         (slopes_monthly[key]) / hists_normalized[key]
     ) - g_cap
-    feedback_area[key] = (cre['net']*hists_normalized[key]).sum() * g_cap 
+    feedback_area[key] = (cre['net']*hists_normalized[key].values).sum() * g_cap.values
     feedback_opacity[key] = (
-        g_prime * hists_normalized[key] * cre["net"]
+        g_prime.values * hists_normalized[key].values * cre["net"]
     ).sum()
 
 # %% plot all distributions and cre for 2016 
@@ -219,6 +224,14 @@ axes[0].plot(
     label=line_labels['rcemip'],
     color=colors['rcemip'],
     linestyle=linestyles['rcemip'],
+)
+
+axes[0].plot(
+    xshield_cont.iwp,
+    xshield_cont['f'],
+    label=line_labels['xshield'],
+    color=colors['xshield'],
+    linestyle=linestyles['xshield'],
 )
 
 for key in hists.keys():
@@ -274,6 +287,14 @@ axes[0].plot(
     linestyle="--",
 )
 
+axes[0].plot(
+    diff_xshield.iwp,
+    diff_xshield.f,
+    label=line_labels["xshield"],
+    color=colors["xshield"],
+    linestyle=linestyles["xshield"],
+)
+
 for key in hists.keys():
     axes[0].plot(
         slopes_monthly[key].iwp,
@@ -312,24 +333,17 @@ fig.savefig("plots/anvil_thinning/slopes_monthly.pdf", bbox_inches="tight")
 
 # %% plot feedback
 fig, axes = plt.subplots(1, 2, figsize=(10, 4), width_ratios=[3, 0.5])
-offsets = {
-    "icon": 0.2,
-    "rcemip": 0.3,
-    "ccic": 0.4,
-    "two_c_ice": 0.5,
-    "dardar": 0.6,
-    "spare_ice": 0.7,
-}
 markers = {
     "icon": "x",
     "rcemip": "x",
+    "xshield": "x",
     "ccic": "o",
     "two_c_ice": "o",
     "dardar": "o",
     "spare_ice": "o",
 }
 
-members = offsets.keys()
+members = markers.keys()
 for key in members:
     axes[0].plot(
         feedback[key].iwp,

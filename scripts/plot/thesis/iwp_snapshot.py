@@ -22,7 +22,7 @@ bts = (
     .load()
 )
 
-# %%
+# %% ccic
 s3 = s3fs.S3FileSystem(anon=True)
 prefix = f"chalmerscloudiceclimatology/record/cpcir/2022/ccic_cpcir_2022010122*"
 files = s3.glob(prefix)
@@ -32,7 +32,7 @@ iwp = ds["tiwp"]
 #  reverse iwp latitude to match bt
 iwp = iwp[:, ::-1, :]
 iwp = iwp.fillna(0)
-# %%
+# %% icon
 icon = (
     xr.open_dataset(
         f"/work/bu1562/m301049/icon-mpim/experiments/jed0011/jed0011_atm_2d_19790701T000040Z.15356915.nc",
@@ -45,7 +45,12 @@ iwp_icon = (
     icon["clivi"] + icon["qsvi"] + icon["qgvi"]
 ).load()
 
-
+# %% land sea mask 
+mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+mask = mask.sel(lat=slice(-30, 30)).load()
+mask = mask.sel(
+        lon=ds["longitude"], lat=ds["latitude"], method="nearest"
+    ).drop_vars(["lon", "lat"])
 # %% 
 background = (1, 1, 1)
 white_cmap = LinearSegmentedColormap.from_list("white", [background, "#110734"])
@@ -161,4 +166,107 @@ fig.savefig('plots/thesis/icon_ccic_iwp.pdf', bbox_inches='tight', dpi=400)
 
 
 
+# %% make plot for thesis cover
+# %% plot ccic and icon in one plot 
+
+cmap_white = LinearSegmentedColormap.from_list(
+    "white_alpha",
+    [
+        (1.0, 1.0, 1.0, 0.0),
+        (1.0, 1.0, 1.0, 1.0), 
+    ],
+)
+cmap_icon = LinearSegmentedColormap.from_list("white", ["#020640", (1, 1, 1, 1)])
+cmap_ccic = LinearSegmentedColormap.from_list("white", [(1, 1, 1, 1), "#023201"])
+projection = ccrs.PlateCarree()
+
+fig, axes = plt.subplots(2, 1, figsize=(12, 4.5), subplot_kw={"projection": projection})
+fig.set_dpi(400)
+fig.patch.set_facecolor("white")
+for ax in axes:
+    ax.set_extent([-180, 180, -30, 30], crs=ccrs.PlateCarree())
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for s in ax.spines.values():
+        s.set_visible(False)
+
+
+# plot icon
+cmap_white = cmap_white.copy()
+cmap_white.set_bad((1, 1, 1, 0))    # invalid (e.g. 0 in LogNorm) -> transparent
+cmap_white.set_under((1, 1, 1, 0))  # below vmin -> transparent
+axes[0].set_facecolor("#02022E") 
+xlims = axes[0].get_xlim()
+ylims = axes[0].get_ylim()
+im = egh.healpix_resample(
+    iwp_icon.values, xlims, ylims, nx, ny, axes[0].projection, "nearest", nest=True
+)
+im = im.fillna(0)
+vmin, vmax = 1e-3, 10
+norm = LogNorm(vmin=vmin, vmax=vmax)
+axes[0].imshow(im, extent=xlims + ylims, origin="lower", cmap=cmap_white, norm=norm)
+
+
+# plot ccic
+axes[1].pcolormesh(
+    mask["longitude"],
+    mask["latitude"],
+    mask,
+    cmap=LinearSegmentedColormap.from_list("white", ["#011E00", "#02022E",]), # two colors, one for land and one for sea
+    rasterized=True,
+    transform=ccrs.PlateCarree(),
+)
+im = axes[1].pcolormesh(
+    iwp["longitude"],
+    iwp["latitude"],
+    iwp.isel(time=0),
+    cmap=cmap_white,
+    norm=norm,
+    rasterized=True,
+    transform=ccrs.PlateCarree(),
+)
+
+fig.savefig('plots/thesis/icon_ccic_iwp_cover.pdf', dpi=400, bbox_inches='tight')
+# %% next try
+
+
+cmap_icon = LinearSegmentedColormap.from_list("white", [(1, 1, 1, 1), "#020640",])
+cmap_ccic = LinearSegmentedColormap.from_list("white", [(1, 1, 1, 1), "#023201"])
+projection = ccrs.PlateCarree()
+
+fig, axes = plt.subplots(2, 1, figsize=(15, 10), subplot_kw={"projection": projection})
+fig.set_dpi(400)
+fig.patch.set_facecolor("white")
+for ax in axes:
+    ax.set_extent([-90, 90, -30, 30], crs=ccrs.PlateCarree())
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for s in ax.spines.values():
+        s.set_visible(False)
+
+
+# plot icon
+xlims = axes[0].get_xlim()
+ylims = axes[0].get_ylim()
+im = egh.healpix_resample(
+    iwp_icon.values, xlims, ylims, nx, ny, axes[0].projection, "nearest", nest=True
+)
+im = im.fillna(0)
+vmin, vmax = 1e-3, 10
+norm = LogNorm(vmin=vmin, vmax=vmax)
+axes[0].imshow(im, extent=xlims + ylims, origin="lower", cmap=cmap_icon, norm=norm)
+
+
+# plot ccic
+im = axes[1].pcolormesh(
+    iwp["longitude"],
+    iwp["latitude"],
+    iwp.isel(time=0),
+    cmap=cmap_ccic,
+    norm=norm,
+    rasterized=True,
+    transform=ccrs.PlateCarree(),
+)
+
+fig.savefig('plots/thesis/icon_ccic_iwp_cover.pdf', dpi=400, bbox_inches='tight')
 # %%
