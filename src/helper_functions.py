@@ -286,7 +286,13 @@ def load_histograms(freq="1ME"):
     hists["ccic"] = xr.open_dataset(
         "/work/bm1183/m301049/ccic/hists/ccic_monthly_hist_interpolated.nc"
     )
-    hists["two_c_ice"] = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists_no_dup.nc")
+    hist_2d = xr.open_dataset(
+        "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    )
+    hists["ccic"]["size"] = hist_2d["size"]
+    hists["two_c_ice"] = xr.open_dataset(
+        "/work/bm1183/m301049/cloudsat/dists_no_dup.nc"
+    )
     hists["dardar"] = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
     hists["spare_ice"] = xr.open_dataset(
         "/work/bm1183/m301049/spareice/hists_metop.nc"
@@ -298,3 +304,40 @@ def load_histograms(freq="1ME"):
         hists[key] = hists[key].transpose("time", "iwp")
         hists[key]["time"] = pd.to_datetime(hists[key]["time"].dt.strftime("%Y-%m"))
     return hists
+
+
+runs = ["jed0011", "jed0022", "jed0033"]
+experiments = {"jed0011": "control", "jed0022": "plus4K", "jed0033": "plus2K"}
+
+
+def load_random_datasets(version="processed"):
+    """
+    Load the random datasets for the model.
+
+    Parameters
+    ----------
+    processed : bool, optional
+        If True, load the processed datasets, otherwise load the raw datasets. Default is True.
+
+    Returns
+    -------
+    dict
+        Dictionary containing the random datasets.
+    """
+    datasets = {}
+    if version == "processed":
+        for run in runs:
+            datasets[run] = xr.open_dataset(
+                f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample_processed_64.nc"
+            )
+    elif version == "temp":
+        for run in runs:
+            datasets[run] = xr.open_dataset(
+                f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample_tgrid_20.nc"
+            )
+    else:
+        for run in runs:
+            datasets[run] = xr.open_dataset(
+                f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample.nc"
+            )
+    return datasets

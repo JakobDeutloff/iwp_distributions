@@ -137,6 +137,49 @@ warming_pattern_nino_500 = calc_warming_pattern_int_var(
 
 # %% plot warming pattern of thrend and internal variability
 fig, axes = plt.subplots(
+    2,
+    1,
+    figsize=(10, 6),
+    subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+)
+warming_pattern_trend.plot(
+    ax=axes[0],
+    cmap="bwr",
+    vmin=0,
+    vmax=2,
+    transform=ccrs.PlateCarree(),
+    add_colorbar=False,
+)
+im = warming_pattern_nino.plot(
+    ax=axes[1],
+    cmap="bwr",
+    vmin=0,
+    vmax=2,
+    transform=ccrs.PlateCarree(),
+    add_colorbar=False,
+)
+
+
+for ax in axes:
+    ax.coastlines()
+    ax.set_title("")
+
+axes[0].set_title("Linear Trend $T_{2m}$")
+axes[1].set_title("Internal Variability $T_{2m}$")
+fig.colorbar(
+    im,
+    ax=axes,
+    orientation="horizontal",
+    label="Relative Warming (K/K)",
+    pad=0.05,
+    aspect=50,
+    extend="both",
+)
+
+fig.savefig("plots/anvil_thinning/temp_pattern.png", dpi=300, bbox_inches="tight")
+
+# %% plot warming pattern of thrend and internal variability
+fig, axes = plt.subplots(
     4,
     1,
     figsize=(10, 10),

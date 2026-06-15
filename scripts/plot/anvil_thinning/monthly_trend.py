@@ -234,7 +234,7 @@ axes[0].plot(
     linestyle=linestyles['xshield'],
 )
 
-for key in hists.keys():
+for key in ["dardar", "two_c_ice", "spare_ice", "ccic"]:
     axes[0].plot(
         hists[key].iwp,
         hists[key]['hist'].sel(time="2016").sum('time') / hists[key]['size'].sel(time="2016").sum('time'),
@@ -264,9 +264,9 @@ axes[1].set_yticks([-100, 0, 40])
 axes[0].set_yticks([0, 0.006, 0.012])
 
 # add letters
-for i, ax in enumerate(axes):
-    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
-fig.savefig("plots/anvil_thinning/distributions_cre_2016.pdf", bbox_inches="tight")
+# for i, ax in enumerate(axes):
+#     ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+fig.savefig("plots/anvil_thinning/talk/distributions_cre_2016_icon_rce_x_obs_mach.pdf", bbox_inches="tight")
 
 # %% plot slopes and p-value
 fig, axes = plt.subplots(2, 1,figsize=(8, 6), sharex=True, height_ratios=[3, 1])
@@ -320,16 +320,18 @@ axes[0].set_ylabel(r"d$P(I)$/d$T$ / K$^{-1}$")
 axes[1].set_ylabel("p-value")
 axes[1].set_xlabel(r"$I$ / kg m$^{-2}$")
 axes[0].set_yticks([-0.0006, -0.0002, 0, 0.0002])
+axes[0].set_ylim(-0.00061, 0.0002)
 axes[1].set_yticks([0.05, 0.5, 1])
 axes[1].axhline(0.05, color="k", linewidth=0.5)
-handles, labels = axes[0].get_legend_handles_labels()
-fig.legend(handles, labels, frameon=False, ncol=3, bbox_to_anchor=(0.75, 0))
+# handles, labels = axes[0].get_legend_handles_labels()
+# fig.legend(handles, labels, frameon=False, ncol=3, bbox_to_anchor=(0.75, 0))
+axes[0].legend(frameon=False, loc="lower right")
 
-# add letters
-for i, ax in enumerate(axes):
-    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+# # add letters
+# for i, ax in enumerate(axes):
+#     ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
 
-fig.savefig("plots/anvil_thinning/slopes_monthly.pdf", bbox_inches="tight")
+fig.savefig("plots/anvil_thinning/talk/slopes_monthly_icon_rce_obs.pdf", bbox_inches="tight")
 
 # %% plot feedback
 fig, axes = plt.subplots(1, 2, figsize=(10, 4), width_ratios=[3, 0.5])
@@ -343,7 +345,7 @@ markers = {
     "spare_ice": "o",
 }
 
-members = markers.keys()
+members = ['icon', 'rcemip', 'xshield', 'dardar', 'two_c_ice', 'spare_ice', 'ccic']
 for key in members:
     axes[0].plot(
         feedback[key].iwp,
@@ -355,20 +357,20 @@ for key in members:
 
     axes[1].scatter(
         0,
-        feedback[key].sum().item(),
+        feedback[key].sum().item()/2,
         color=colors[key],
         marker=markers[key],
         label=line_labels[key],
     )
     axes[1].scatter(
         1,
-        feedback_area[key].item(),
+        feedback_area[key].item()/2,
         color=colors[key],
         marker=markers[key],
     )
     axes[1].scatter(
         2,
-        feedback_opacity[key].item(),
+        feedback_opacity[key].item()/2,
         color=colors[key],
         marker=markers[key],
     )
@@ -380,26 +382,29 @@ for ax in axes:
 
 axes[0].set_xscale("log")
 axes[0].set_xlim(1e-3, 2e1)
-axes[0].set_ylabel(r"$\lambda(I)$ / W m$^{-2}$ K$^{-1}$")
+axes[0].set_ylabel(r"$\lambda_{\mathrm{P}}(I)$ / W m$^{-2}$ K$^{-1}$")
 axes[0].set_xlabel(r"$I$ / kg m$^{-2}$")
 axes[0].legend(frameon=False, loc="upper left")
 axes[0].set_yticks([-0.02, 0, 0.02])
+axes[0].set_ylim(-0.022, 0.03)
 
 axes[1].set_xticks([0, 1, 2])
 axes[1].set_xlim(-0.5, 2.5)
 axes[1].set_xticklabels(["Total", "Area", "Opacity"], rotation=45)
-axes[1].set_ylabel(r"$\lambda$ / W m$^{-2}$ K$^{-1}$")
-axes[1].set_yticks([-0.05, 0, 0.05, 0.15])
+axes[1].set_ylabel(r"$\lambda_{\mathrm{P}}$ / W m$^{-2}$ K$^{-1}$")
+axes[1].set_yticks([-0.02, 0, 0.05, 0.1])
+axes[1].set_ylim(-0.035, 0.1)
+
 
 handles, labels = axes[1].get_legend_handles_labels()
 fig.legend(handles, labels, frameon=False, ncol=1, bbox_to_anchor=(1.1, 0.98))
 
-# add letters
-for i, ax in enumerate(axes):
-    ax.text(0.03, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+# # add letters
+# for i, ax in enumerate(axes):
+#     ax.text(0.03, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
 
 fig.tight_layout()
-fig.savefig("plots/anvil_thinning/feedback_monthly.pdf", bbox_inches="tight")
+fig.savefig("plots/anvil_thinning/talk/feedback_monthly_icon_rce_x_obs.pdf", bbox_inches="tight")
 
 # %% calculate mean and std of feedback 
 mean_feedback = np.mean([feedback[key].sum().item()/2 for key in ['ccic', 'spare_ice', 'two_c_ice', 'dardar']])

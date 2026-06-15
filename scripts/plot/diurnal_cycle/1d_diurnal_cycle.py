@@ -10,7 +10,7 @@ from src.helper_functions import (
 from scipy.signal import detrend
 
 
-# %% load ccic data
+# %% load ccic and gpm data
 color = {"all": "black", "sea": "blue", "land": "green"}
 names = ["all", "sea", "land"]
 dims = {"ccic": "iwp", "gpm": "bt"}
@@ -23,7 +23,8 @@ for name in names:
     hists_gpm[name] = xr.open_dataset(
         f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_{name}.nc"
     )
-
+    hists_ccic[name] = hists_ccic[name].groupby("time.year").mean("time").rename(year="time")
+    hists_gpm[name] = hists_gpm[name].groupby("time.year").mean("time").rename(year="time")
 # %% calculate cloud fraction
 cf_ccic = {}
 cf_gpm = {}
@@ -52,6 +53,8 @@ temps["sea"] = xr.open_dataset(
 temps["land"] = xr.open_dataset(
     "/work/bm1183/m301049/era5/monthly/t2m_tropics_land.nc"
 ).t2m
+for name in names:
+    temps[name] = temps[name].groupby("time.year").mean("time").rename(year="time")
 
 # %% detrend and deseasonalize
 temps_deseason = {}
@@ -59,14 +62,14 @@ for name in names:
     temp_detrend = xr.DataArray(
         detrend(temps[name]), coords=temps[name].coords, dims=temps[name].dims
     )
-    temps_deseason[name] = deseason(temp_detrend)
+    temps_deseason[name] = temp_detrend #deseason(temp_detrend)
 cf_ccic_deseason = {}
 cf_gpm_deseason = {}
 for name in names:
     cf_detrend = nan_detrend(cf_ccic_norm[name], dim="local_time")
-    cf_ccic_deseason[name] = deseason(cf_detrend)
+    cf_ccic_deseason[name] = cf_detrend #deseason(cf_detrend)
     cf_detrend = nan_detrend(cf_gpm_norm[name], dim="local_time")
-    cf_gpm_deseason[name] = deseason(cf_detrend)
+    cf_gpm_deseason[name] = cf_detrend #deseason(cf_detrend)
 
 # %% regression
 slopes_ccic = {}
@@ -93,11 +96,9 @@ hists_raw = {}
 slopes_icon = {}
 for run in runs:
     hists_raw[run] = xr.open_dataset(
-        f"/work/bm1183/m301049/icon_hcap_data/publication/distributions/{run}_deep_clouds_daily_cycle.nc"
+        f"/work/bm1183/m301049/icon_hcap_data/publication/distributions/{run}_daily_cycle_hist_2d.nc"
     )
-    hists_icon[run] = (hists_raw[run].sum("day") / hists_raw[run].sum())[
-        "__xarray_dataarray_variable__"
-    ].values
+    hists_icon[run] = hists_raw[run]["hist"].sel(iwp=slice(1, None)).sum("iwp") / hists_raw[run]["size"]
 
 
 for run in runs[1:]:
@@ -132,7 +133,7 @@ ax.legend(handles, labels, frameon=False)
 ax.spines[["top", "right"]].set_visible(False)
 ax.set_xticks([6, 12, 18])
 ax.set_yticks([0.001, 0.002, 0.003])
-fig.savefig("plots/diurnal_cycle/publication/mean_dc.pdf", bbox_inches="tight")
+#fig.savefig("plots/diurnal_cycle/publication/mean_dc.pdf", bbox_inches="tight")
 
 # %% calculate total cf
 total_cf_ccic = {}
@@ -173,8 +174,8 @@ def plot_change_diurnal_cycle(slopes, err):
 
 fig_ccic_change = plot_change_diurnal_cycle(slopes_ccic, err_ccic)
 fig_gpm_change = plot_change_diurnal_cycle(slopes_gpm, err_gpm)
-fig_ccic_change.savefig("plots/diurnal_cycle/talk/ccic_1d_change.pdf", bbox_inches="tight")
-fig_gpm_change.savefig("plots/diurnal_cycle/talk/gpm_1d_change.pdf", bbox_inches="tight")
+#fig_ccic_change.savefig("plots/diurnal_cycle/talk/ccic_1d_change.pdf", bbox_inches="tight")
+#fig_gpm_change.savefig("plots/diurnal_cycle/talk/gpm_1d_change.pdf", bbox_inches="tight")
 
 # %% calculate mean change in f
 for name in names:

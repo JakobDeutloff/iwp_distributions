@@ -170,6 +170,11 @@ fig, axes = plot_2d_trend(
 )
 #fig.savefig("plots/diurnal_cycle/publication/ccic_2d_trend.pdf", bbox_inches='tight')
 
+# %% numbers for feedback 
+mean_feedback = feedback_cum_bs["ccic"].isel(iwp=-1).values
+err_feedback = err_feedback_bs["ccic"].isel(iwp=-1).values
+print(f'Feedback: {mean_feedback:.2f} +/- {err_feedback:.2f} W/m^2/K')
+
 # %% plot slopes gpm
 fig, axes = plot_2d_trend(
     cf["gpm"].mean('time'),

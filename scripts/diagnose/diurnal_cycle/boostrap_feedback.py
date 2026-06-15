@@ -70,6 +70,14 @@ for name in names:
     hists_detrend[name] = deseason(hists_detrend[name])
 
 # %%
+
+def get_albedo(name):
+    offset = np.random.uniform(-0.2, 0.2)
+    albedo_rand = albedo[name] + (offset * albedo[name])
+    albedo_rand = albedo_rand.clip(0, 1)
+    return albedo_rand
+
+
 def calc_feedback_bs(seed, name='ccic', len_block=36):
 
     n_sample = hists_detrend[name].time.size
@@ -97,7 +105,7 @@ def calc_feedback_bs(seed, name='ccic', len_block=36):
     )  # 1/1
     area_change_bs = (slope_bs / 100) * area_fraction_bs  # 1/K
     feedback_2d_bs = -1 * (
-        (area_change_bs * SW_in * albedo[name]) - ((area_change_bs) * SW_in * 0.1)
+        (area_change_bs * SW_in * get_albedo(name)) - ((area_change_bs) * SW_in * 0.1)
     )  # W / m^2 / K
     return feedback_2d_bs
 
@@ -111,11 +119,11 @@ feedbacks = xr.concat(results, dim="iteration")
 feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d.nc")
 
 # %% calc feedback gpm
-with ProcessPoolExecutor(max_workers=128) as executor:
-    results = list(
-        tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['gpm'] * n_iterations), total=n_iterations)
-    )
-feedbacks_gpm = xr.concat(results, dim="iteration")
-feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc")
+# with ProcessPoolExecutor(max_workers=128) as executor:
+#     results = list(
+#         tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['gpm'] * n_iterations), total=n_iterations)
+#     )
+# feedbacks_gpm = xr.concat(results, dim="iteration")
+# feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc")
 
 # %%
