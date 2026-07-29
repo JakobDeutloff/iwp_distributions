@@ -263,9 +263,9 @@ axes[1].set_ylabel(r"$C(I)$ / W m$^{-2}$")
 axes[1].set_yticks([-100, 0, 40])
 axes[0].set_yticks([0, 0.006, 0.012])
 
-# add letters
-# for i, ax in enumerate(axes):
-#     ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+#add letters
+for i, ax in enumerate(axes):
+    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
 fig.savefig("plots/anvil_thinning/talk/distributions_cre_2016_icon_rce_x_obs_mach.pdf", bbox_inches="tight")
 
 # %% plot slopes and p-value
@@ -323,15 +323,14 @@ axes[0].set_yticks([-0.0006, -0.0002, 0, 0.0002])
 axes[0].set_ylim(-0.00061, 0.0002)
 axes[1].set_yticks([0.05, 0.5, 1])
 axes[1].axhline(0.05, color="k", linewidth=0.5)
-# handles, labels = axes[0].get_legend_handles_labels()
-# fig.legend(handles, labels, frameon=False, ncol=3, bbox_to_anchor=(0.75, 0))
-axes[0].legend(frameon=False, loc="lower right")
+handles, labels = axes[0].get_legend_handles_labels()
+fig.legend(handles, labels, frameon=False, ncol=3, bbox_to_anchor=(0.75, 0))
 
-# # add letters
-# for i, ax in enumerate(axes):
-#     ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
+# add letters
+for i, ax in enumerate(axes):
+    ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
 
-fig.savefig("plots/anvil_thinning/talk/slopes_monthly_icon_rce_obs.pdf", bbox_inches="tight")
+fig.savefig("plots/anvil_thinning//slopes_monthly.pdf", bbox_inches="tight")
 
 # %% plot feedback
 fig, axes = plt.subplots(1, 2, figsize=(10, 4), width_ratios=[3, 0.5])
@@ -416,44 +415,6 @@ print(f"Feedback for RCEMIP: {feedback['rcemip'].sum().item()/2:.4f} W m^-2 K^-1
 
 # %% caclculate feedback fro every satellite
 total_feedback = [feedback[key].sum().item()/2 for key in ['ccic', 'spare_ice', 'two_c_ice', 'dardar']]
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=hists_deseason["ccic"].time),
-    hists_deseason["ccic"].T,
-    slopes_monthly["ccic"],
-    error_montly["ccic"],
-    "CCIC Monthly",
-)
-fig.savefig("plots/anvil_thinning/ccic_monthly.png", dpi=300, bbox_inches="tight")
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=hists_deseason["two_c_ice"].time),
-    hists_deseason["two_c_ice"].T,
-    slopes_monthly["two_c_ice"],
-    error_montly["two_c_ice"],
-    "2C-ICE Monthly",
-)
-fig.savefig("plots/anvil_thinning/2c_monthly.png", dpi=300, bbox_inches="tight")
-
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=hists_deseason["dardar"].time),
-    hists_deseason["dardar"].T,
-    slopes_monthly["dardar"],
-    error_montly["dardar"],
-    "DARDAR v3.10 Monthly",
-)
-fig.savefig("plots/anvil_thinning/dardar_monthly.png", dpi=300, bbox_inches="tight")
-
-# %%
-fig, axes = plot_regression(
-    t_deseason.sel(time=slice(None, "2025-07")),
-    hists_deseason["spare_ice"].T,
-    slopes_monthly["spare_ice"],
-    error_montly["spare_ice"],
-    "SPARE-ICE Monthly",
-)
-fig.savefig("plots/anvil_thinning/spare_monthly.png", dpi=300, bbox_inches="tight")
 
 # %% plot for thesis 
 offsets = {
@@ -584,5 +545,239 @@ fig.savefig("plots/thesis/feedback_monthly_thesis.pdf", bbox_inches="tight")
 # %% print feedback values for table
 for key in ['ccic', 'spare_ice', 'two_c_ice', 'dardar', 'icon_2K', 'icon_4K', 'rcemip']:
     print(f"{key}: {feedback[key].sum().item()/2:.3f} W m^-2 K^-1")
+
+# %% plots for talk 
+#  plot all distributions
+fig, ax = plt.subplots(figsize=(8, 4))
+
+colors['icon_control']  = "#462d7b"
+colors['icon_2K'] = '#1f948a'
+colors['icon_4K'] = '#c1df24'
+line_labels['icon_2K'] = "ICON +2K"
+line_labels['icon_4K'] = "ICON +4K" 
+line_labels['icon_control'] = "ICON"
+linestyles['icon_2K'] = "--"
+linestyles['icon_4K'] = "--"
+linestyles['icon_control'] = "--"
+
+ax.plot(
+    iwp_hists_int['jed0011'].iwp,
+    iwp_hists_int["jed0011"],
+    label=line_labels['icon_control'],
+    color=colors['icon_control'],
+    linestyle=linestyles['icon_control'],
+)
+ax.plot(
+    rcemip_pdf.iwp,
+    rcemip_pdf.sel(SST=295),
+    label=line_labels['rcemip'],
+    color=colors['rcemip'],
+    linestyle=linestyles['rcemip'],
+)
+
+
+for key in ["dardar", "two_c_ice", "spare_ice", "ccic"]:
+    ax.plot(
+        hists[key].iwp,
+        hists[key]['hist'].sel(time="2016").sum('time') / hists[key]['size'].sel(time="2016").sum('time'),
+        label=line_labels[key],
+        color=colors[key],
+        linestyle=linestyles[key],
+    )
+
+
+
+ax.set_xscale("log")
+ax.set_xlim([1e-3, 2e1])
+ax.set_ylim(0, 0.013)
+ax.spines[["top", "right"]].set_visible(False)
+
+ax.legend(frameon=False)
+ax.set_ylabel(r"$P(I)$")
+ax.set_xlabel(r"$I$ / kg m$^{-2}$")
+ax.set_yticks([0, 0.006, 0.012])
+
+fig.savefig("plots/anvil_thinning/talk/distributions_icon_rce_obs.pdf", bbox_inches="tight")
+
+# %%
+fig, axes = plot_regression(
+    temp=t_deseason,
+    hists=hists_deseason["ccic"],
+    slopes=slopes_monthly["ccic"],
+    error=error_montly["ccic"],
+    title='CCIC'
+)
+fig.savefig("plots/anvil_thinning/talk/regression_ccic.pdf", bbox_inches="tight")
+
+# %% plot slopes and p-value
+fig, axes = plt.subplots(2, 1,figsize=(8, 6), sharex=True, height_ratios=[3, 1])
+
+axes[0].plot(
+    iwp_change_icon['jed0033'].iwp,
+    iwp_change_icon['jed0033'],
+    label=line_labels['icon_2K'],
+    color=colors['icon_2K'],
+    linestyle="--",
+)
+
+axes[0].plot(
+    iwp_change_icon['jed0022'].iwp,
+    iwp_change_icon['jed0022'],
+    label=line_labels['icon_4K'],
+    color=colors['icon_4K'],
+    linestyle="--",
+)
+
+axes[0].plot(
+    diff_rcemip.iwp,
+    diff_rcemip,
+    label=line_labels["rcemip"],
+    color=colors["rcemip"],
+    linestyle="--",
+)
+
+
+# for key in hists.keys():
+#     axes[0].plot(
+#         slopes_monthly[key].iwp,
+#         slopes_monthly[key],
+#         label=line_labels[key],
+#         color=colors[key],
+#     )
+#     axes[1].plot(
+#         p_vals_monthly[key].iwp,
+#         p_vals_monthly[key],
+#         label=line_labels[key],
+#         color=colors[key],
+#     )
+
+axes[0].axhline(0, color="k", linewidth=0.5)
+axes[0].set_xscale("log")
+
+for ax in axes:
+    ax.spines[["top", "right"]].set_visible(False)  
+    ax.set_xlim(1e-3, 2e1)
+
+axes[0].set_ylabel(r"d$P(I)$/d$T$ / K$^{-1}$")
+axes[1].set_ylabel("p-value")
+axes[1].set_xlabel(r"$I$ / kg m$^{-2}$")
+axes[0].set_yticks([-0.0006, -0.0002, 0, 0.0002])
+axes[0].set_ylim(-0.00061, 0.0002)
+axes[1].set_yticks([0.05, 0.5, 1])
+axes[1].axhline(0.05, color="k", linewidth=0.5)
+handles, labels = axes[0].get_legend_handles_labels()
+axes[0].legend(handles, labels, frameon=False, loc='lower right')
+
+fig.savefig("plots/anvil_thinning/talk/slopes_monthly_icon_rce.pdf", bbox_inches="tight")
+# %% plot feedback
+fig, axes = plt.subplots(1, 2, figsize=(10, 4), width_ratios=[3, 0.4])
+offsets = {
+    "icon_2K": 0.2,
+    "icon_4K": 0.3,
+    "rcemip": 0.4,
+    "ccic": 0.5,
+    "two_c_ice": 0.6,
+    "dardar": 0.7,
+    "spare_ice": 0.8,
+}
+markers = {
+    "icon_2K": "x",
+    "icon_4K": "x",
+    "rcemip": "x",
+    "ccic": "o",
+    "two_c_ice": "o",
+    "dardar": "o",
+    "spare_ice": "o",
+}
+colors['icon_2K'] = '#1f948a'
+colors['icon_4K'] = '#c1df24'
+line_labels['icon_2K'] = "ICON +2K"
+line_labels['icon_4K'] = "ICON +4K" 
+linestyles['icon_2K'] = "--"
+linestyles['icon_4K'] = "--"
+
+members = ['icon_2K', 'icon_4K', 'rcemip', 'ccic', 'two_c_ice', 'dardar', 'spare_ice']
+for key in members:
+    axes[0].plot(
+        feedback[key].iwp,
+        feedback[key],
+        label=line_labels[key],
+        color=colors[key],
+        linestyle=linestyles[key],
+    )
+
+    axes[1].scatter(
+        0,
+        feedback[key].sum().item()/2,
+        color=colors[key],
+        marker=markers[key],
+        label=line_labels[key],
+    )
+
+for ax in axes:
+    ax.axhline(0, color="k", linewidth=0.5)
+    ax.spines[["top", "right"]].set_visible(False)
+
+
+axes[0].set_xscale("log")
+axes[0].set_xlim(1e-3, 2e1)
+axes[0].set_ylabel(r"$\lambda_{\mathrm{P}}(I)$ / W m$^{-2}$ K$^{-1}$")
+axes[0].set_xlabel(r"$I$ / kg m$^{-2}$")
+axes[0].legend(frameon=False, loc="upper left")
+axes[0].set_yticks([-0.02, 0, 0.02])
+axes[0].set_ylim(-0.022, 0.03)
+
+axes[1].spines[['bottom']].set_visible(False)
+axes[1].set_xticks([])
+axes[1].set_xlim(-0.5, 1.5)
+axes[1].set_ylabel(r"$\lambda_{\mathrm{P}}$ / W m$^{-2}$ K$^{-1}$")
+axes[1].set_yticks([-0.02, 0, 0.05, 0.1])
+axes[1].set_ylim(-0.035, 0.1)
+
+# add sherwood estimate
+axes[1].errorbar(
+    1, 
+    -0.2,
+    yerr=0.2,
+    marker='d',
+    color='#0077b6',
+    capsize=5,
+    label="Sherwood et al. (2020)"
+)
+axes[1].set_yticks([-0.4, -0.2, -0.02, 0, 0.05, 0.1])
+axes[1].set_ylim(-0.4, 0.1)
+
+handles, labels = axes[1].get_legend_handles_labels()
+fig.legend(handles, labels, frameon=False, ncol=1, bbox_to_anchor=(1.2, 0.98))
+
+fig.tight_layout()
+fig.savefig("plots/anvil_thinning/talk/feedback_monthly_all_sh.pdf", bbox_inches="tight")
+
+# %% plot feedback with sherwood estimate 
+fig, ax = plt.subplots(figsize=(1, 5))
+
+
+members = ['icon_2K', 'icon_4K', 'rcemip', 'ccic', 'two_c_ice', 'dardar', 'spare_ice']
+for key in members:
+    ax.scatter(
+        0,
+        feedback[key].sum().item()/2,
+        color=colors[key],
+        marker=markers[key],
+        label=line_labels[key],
+    )
+
+ax.errorbar(
+    1, 
+    -0.2,
+    yerr=0.2,
+    marker='d',
+    color='#0077b6',
+    capsize=5,
+)
+ax.set_xticks([0, 1])
+ax.set_xlim(-0.5, 1.5)
+ax.spines[['top', 'right', 'bottom']].set_visible(False)
+ax.set_yticks([-0.4, -0.2, -0.02, 0, 0.05, 0.1])
 
 # %%

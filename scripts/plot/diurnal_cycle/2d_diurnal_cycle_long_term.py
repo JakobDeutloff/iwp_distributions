@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 
 # %% load ccic and gpm data
 colors, line_labels, linestyles = definitions()
-color = {"ccic": "black", "gpm": "orange", "icon": "green"}
-names = ["ccic", "gpm"]
-dim = {"ccic": "iwp", "gpm": "bt", "icon": "iwp"}
+color = {"ccic": "black", "gpm": "orange", "icon": "green", "era5": "blue"}
+names = ["ccic", "gpm", 'era5']
+dim = {"ccic": "iwp", "gpm": "bt", "icon": "iwp", "era5": "iwp"}
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
@@ -22,6 +22,9 @@ hists["ccic"] = xr.open_dataset(
 )
 hists["gpm"] = xr.open_dataset(
     "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+)
+hists["era5"] = xr.open_dataset(
+    "/work/bm1183/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all.nc"
 )
 
 # %% load albedo
@@ -34,8 +37,8 @@ SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")
 
 # %% calculate cloud fraction
 cf = {}
-for name in ['ccic', 'gpm']:
-    cf[name] = hists[name]['hist'] / hists[name]['hist'].sum(['local_time', dim[name]])
+for name in names:
+    cf[name] = hists[name]['hist'] / hists[name]['size']
 # %% normalise cloud fraction
 cf_norm = {}
 for name in names:
@@ -80,7 +83,6 @@ def regress_hist_temp_2d_trend(cf, temp):
     slopes_perc = slopes * 100 / cf.mean("time")  # convert to % / K
     return slopes_perc, p_values
 
-# %% trend analysis
 slopes = {}
 p_values = {}
 
@@ -89,61 +91,23 @@ for name in names:
         cf_norm[name].fillna(0), temp
     )
 
-# %% trend analysis on annual means
-slopes_ann = {}
-p_values_ann = {}
-for name in names:
-    slopes_ann[name], p_values_ann[name] = regress_hist_temp_2d_trend(
-        cf_norm_ann[name].fillna(0), temp_ann
-    )
-
-# %% normal regression 
-slopes_reg = {}
-p_values_reg = {}
-for name in names:
-    slopes_reg[name], p_values_reg[name] = regress_hist_temp_2d(
-        cf_norm[name].fillna(0), temp, cf_norm[name]
-    )
-
-# %% normal regression on annual means
-slopes_reg_ann = {}
-p_values_reg_ann = {}
-for name in names:
-    slopes_reg_ann[name], p_values_reg_ann[name] = regress_hist_temp_2d(
-        cf_norm_ann[name].fillna(0), temp_ann, cf_norm_ann[name]
-    )
-
-
-
-
 # %% calculate feedback
 cf_change = {}
 feedbacks = {}
 feedbacks_int = {}
 
-cf_change_ann = {}
-feedbacks_ann = {}
-feedbacks_int_ann = {}
-
-cf_change_reg = {}
-feedbacks_reg = {}
-feedbacks_int_reg = {}
-
-cf_change_reg_ann = {}
-feedbacks_reg_ann = {}
-feedbacks_int_reg_ann = {}
-
 cutoffs = {
     "ccic": {"iwp": slice(1e-1, None)},
     "gpm": {"bt": slice(None, 260)},
+    "era5": {"iwp": slice(1e-1, None)},
 }
 albedo = {
     "ccic": albedo_iwp["hc_albedo"],
     "gpm": albedo_bt["hc_albedo"],
-    "icon": albedo_iwp["hc_albedo"],
+    "era5": albedo_iwp["hc_albedo"],
 }
 
-for name in ['ccic', 'gpm']:
+for name in names:
     cf_change[name] = (slopes[name] / 100) *  cf[name].mean('time')  # 1/K
     feedbacks[name] = -1 * (
         (cf_change[name] * SW_in * albedo[name].values.T)
@@ -151,28 +115,8 @@ for name in ['ccic', 'gpm']:
     )  # W / m^2 / K
     feedbacks_int[name] = feedbacks[name].sel(cutoffs[name]).sum()  # W / m^2 / K
 
-    cf_change_ann[name] = (slopes_ann[name] / 100) *  cf_ann[name].mean('time')  # 1/K
-    feedbacks_ann[name] = -1 * (
-        (cf_change_ann[name] * SW_in * albedo[name].values.T)
-        - ((cf_change_ann[name]) * SW_in * 0.1)
-    )  # W / m^2 / K
-    feedbacks_int_ann[name] = feedbacks_ann[name].sel(cutoffs[name]).sum()  # W / m^2 / K   
-    cf_change_reg[name] = (slopes_reg[name] / 100) *  cf[name].mean('time')  # 1/K
-    feedbacks_reg[name] = -1 * (
-        (cf_change_reg[name] * SW_in * albedo[name].values.T)
-        - ((cf_change_reg[name]) * SW_in * 0.1)
-    )  # W / m^2 / K
-    feedbacks_int_reg[name] = feedbacks_reg[name].sel(cutoffs[name]).sum()  # W / m^2 / K
-    cf_change_reg_ann[name] = (slopes_reg_ann[name] / 100) *  cf_ann[name].mean('time')  # 1/K
-    feedbacks_reg_ann[name] = -1 * (
-        (cf_change_reg_ann[name] * SW_in * albedo[name].values.T)
-        - ((cf_change_reg_ann[name]) * SW_in * 0.1)
-    )  # W / m^2 / K
-    feedbacks_int_reg_ann[name] = feedbacks_reg_ann[name].sel(cutoffs[name]).sum()  # W / m^2 / K
 
-
-
-# %% calculate cumulative feedback from bootstrapped samples
+# %% calculate cumulative feedback 
 feedback_cum = {}
 feedback_cum_ann = {}
 feedback_cum_reg = {}
@@ -190,45 +134,13 @@ feedback_cum["gpm"] = (
     .isel(bt=slice(None, None, -1))
     .cumsum("bt")
 )
-feedback_cum_ann["ccic"] = (
-    feedbacks_ann["ccic"]
-    .sel(cutoffs["ccic"])
+feedback_cum["era5"] = (
+    feedbacks["era5"]
+    .sel(cutoffs["era5"])
     .sum("local_time")
     .cumsum("iwp")
 )
-feedback_cum_ann["gpm"] = (
-    feedbacks_ann["gpm"]
-    .sel(cutoffs["gpm"])
-    .sum("local_time")
-    .isel(bt=slice(None, None, -1))
-    .cumsum("bt")
-)
-feedback_cum_reg["ccic"] = (
-    feedbacks_reg["ccic"]
-    .sel(cutoffs["ccic"])      
-    .sum("local_time")
-    .cumsum("iwp")
-)
-feedback_cum_reg["gpm"] = (
-    feedbacks_reg["gpm"]
-    .sel(cutoffs["gpm"])
-    .sum("local_time")
-    .isel(bt=slice(None, None, -1))
-    .cumsum("bt")
-)
-feedback_cum_reg_ann["ccic"] = (
-    feedbacks_reg_ann["ccic"]
-    .sel(cutoffs["ccic"])
-    .sum("local_time")
-    .cumsum("iwp")
-)
-feedback_cum_reg_ann["gpm"] = (
-    feedbacks_reg_ann["gpm"]
-    .sel(cutoffs["gpm"])
-    .sum("local_time")
-    .isel(bt=slice(None, None, -1))
-    .cumsum("bt")
-)
+
 # %% plot slopes ccic trend
 fig, axes = plot_2d_trend(
     cf["ccic"].mean('time'),
@@ -240,6 +152,7 @@ fig, axes = plot_2d_trend(
     err_cum=0,
     dim="iwp",
 )
+fig.savefig("plots/diurnal_cycle/long_term/trend_2d_ccic.pdf", bbox_inches="tight")
 
 # %% plot slopes gpm trend
 fig, axes = plot_2d_trend(
@@ -252,76 +165,18 @@ fig, axes = plot_2d_trend(
     err_cum=0,
     dim="bt",
 )
-# %% plot slopes ccic trend annual means
+fig.savefig("plots/diurnal_cycle/long_term/trend_2d_gpm.pdf", bbox_inches="tight")
+# %% plot slopes era5 trend
 fig, axes = plot_2d_trend(
-    cf_ann["ccic"].mean('time'),
-    slopes_ann["ccic"],
-    cf_change_ann["ccic"],
-    feedbacks_ann["ccic"],
-    p_values_ann["ccic"],
-    feedback_cum_ann["ccic"],
+    cf["era5"].mean('time'),
+    slopes["era5"],
+    cf_change["era5"],
+    feedbacks["era5"],
+    p_values["era5"],
+    feedback_cum["era5"],
     err_cum=0,
     dim="iwp",
 )
-
-# %% plot slopes gpm trend annual means
-fig, axes = plot_2d_trend(
-    cf_ann["gpm"].mean('time'),
-    slopes_ann["gpm"],
-    cf_change_ann["gpm"],
-    feedbacks_ann["gpm"],
-    p_values_ann["gpm"],
-    feedback_cum_ann["gpm"],
-    err_cum=0,
-    dim="bt",
-)
-
-# %% plot slopes ccic trend normal regression
-fig, axes = plot_2d_trend(
-    cf["ccic"].mean('time'),
-    slopes_reg["ccic"],
-    cf_change_reg["ccic"],
-    feedbacks_reg["ccic"],
-    p_values_reg["ccic"],
-    feedback_cum_reg["ccic"],
-    err_cum=0,
-    dim="iwp",
-)
-
-# %% plot slopes gpm trend normal regression
-fig, axes = plot_2d_trend(
-    cf["gpm"].mean('time'),
-    slopes_reg["gpm"],
-    cf_change_reg["gpm"],
-    feedbacks_reg["gpm"],
-    p_values_reg["gpm"],
-    feedback_cum_reg["gpm"],
-    err_cum=0,
-    dim="bt",
-)
-
-# %% plot slopes ccic trend normal regression annual means
-fig, axes = plot_2d_trend(
-    cf_ann["ccic"].mean('time'),
-    slopes_reg_ann["ccic"],
-    cf_change_reg_ann["ccic"],
-    feedbacks_reg_ann["ccic"],
-    p_values_reg_ann["ccic"],
-    feedback_cum_reg_ann["ccic"],
-    err_cum=0,
-    dim="iwp",
-)
-
-# %% plot slopes gpm trend normal regression annual means
-fig, axes = plot_2d_trend(
-    cf_ann["gpm"].mean('time'),
-    slopes_reg_ann["gpm"],
-    cf_change_reg_ann["gpm"],
-    feedbacks_reg_ann["gpm"],
-    p_values_reg_ann["gpm"],
-    feedback_cum_reg_ann["gpm"],
-    err_cum=0,
-    dim="bt",
-)
+fig.savefig("plots/diurnal_cycle/long_term/trend_2d_era5.pdf", bbox_inches="tight")
 
 # %%

@@ -20,7 +20,7 @@ def plot_regression(temp, hists, slopes, error, title):
     im = axes[0, 1].pcolormesh(
         hists.iwp,
         hists.time,
-        (hists - hists.mean("time")).T,
+        (hists - hists.mean("time")),
         cmap="seismic",
         vmin=-0.001,
         vmax=0.001,
@@ -33,14 +33,14 @@ def plot_regression(temp, hists, slopes, error, title):
 
     # slopes
     axes[1, 1].plot(hists.iwp, slopes, color="k", label="CCIC")
-    axes[1, 1].fill_between(
-        hists.iwp,
-        slopes - error,
-        slopes + error,
-        color="gray",
-        alpha=0.5,
-        label="95% confidence interval",
-    )
+    # axes[1, 1].fill_between(
+    #     hists.iwp,
+    #     slopes - error,
+    #     slopes + error,
+    #     color="gray",
+    #     alpha=0.5,
+    #     label="95% confidence interval",
+    # )
     axes[1, 1].axhline(0, color="gray", linestyle="-")
     axes[1, 1].set_ylabel("dP(I)/dT / K$^{-1}$")
     axes[1, 1].set_xlabel("I / kg m$^{-2}$")

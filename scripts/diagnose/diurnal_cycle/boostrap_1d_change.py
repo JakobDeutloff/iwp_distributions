@@ -28,7 +28,7 @@ datasets = ['ccic', 'gpm']
 for ds in datasets:
     for region in regions:
         hists[ds][region] = xr.open_dataset(
-            f"/work/bm1183/m301049/diurnal_cycle_dists/{ds}_2d_monthly_{region}.nc"
+            f"/work/bm1183/m301049/diurnal_cycle_dists/{ds}_2d_monthly_{region}_weighted.nc"
         )
 
 # %% calculate cloud fraction
@@ -79,12 +79,18 @@ cf_deseason = {
     'ccic': {},
     'gpm': {}
 }
+cf_deseason_nonnorm = {
+    'ccic': {},
+    'gpm': {}
+}
 for ds in datasets:
     for region in regions:
         cf_detrend = nan_detrend(cf_norm[ds][region], dim="local_time")
         cf_deseason[ds][region] = deseason(cf_detrend)
+        cf_detrend_nonnorm = nan_detrend(cf[ds][region], dim="local_time")
+        cf_deseason_nonnorm[ds][region] = deseason(cf_detrend_nonnorm)
 
-# %% regression
+# %% calc slopes
 
 def calc_regression_bs(seed, dataset='ccic', region='all', len_block=36):
 
@@ -107,7 +113,6 @@ def calc_regression_bs(seed, dataset='ccic', region='all', len_block=36):
     )
     return slopes
 
-# %% calc slopes
 n_iterations = 2000
 for dataset in datasets:
     for region in regions:
@@ -118,5 +123,38 @@ for dataset in datasets:
         slopes = xr.concat(results, dim="iteration")
         slopes.to_netcdf(f"/work/bm1183/m301049/diurnal_cycle_publication/{dataset}_{region}_bootstrap_slopes_1d.nc")
 
+
+# %% calc slopes non-normalised 
+
+def calc_regression_bs(seed, dataset='ccic', region='all', len_block=36):
+
+    n_sample = cf[dataset][region].time.size
+    n_blocks = int(cf[dataset][region].time.size / len_block)
+    max_idx_block = n_sample-len_block
+    np.random.seed(seed)
+    block_idxs = np.random.randint(0, max_idx_block, n_blocks)
+    time_idx = []
+
+    for i in block_idxs:
+        time_idx.extend(
+            list(
+                range(i, i+len_block)
+            )  # create list of time indices
+        )
+    
+    slopes, _ = regress_hist_temp_1d(
+        cf_deseason_nonnorm[dataset][region].isel(time=time_idx), temps_deseason[region], cf[dataset][region]
+    )
+    return slopes
+
+n_iterations = 2000
+for dataset in datasets:
+    for region in regions:
+        with ProcessPoolExecutor(max_workers=128) as executor:
+            results = list(
+                tqdm(executor.map(calc_regression_bs, range(n_iterations), [dataset] * n_iterations, [region] * n_iterations), total=n_iterations)
+            )
+        slopes = xr.concat(results, dim="iteration")
+        slopes.to_netcdf(f"/work/bm1183/m301049/diurnal_cycle_publication/{dataset}_{region}_bootstrap_slopes_1d_nonnorm.nc")
 
 # %%

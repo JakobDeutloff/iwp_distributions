@@ -13,4 +13,4 @@ set -o errexit -o nounset -o pipefail -o xtrace
 export PYTHONPATH="/home/m/m301049/iwp_distributions/"
 
 # execute python script in respective environment 
-/home/m/m301049/.conda/envs/main/bin/python /home/m/m301049/iwp_distributions/scripts/diagnose/era5/calc_stability_era5.py
+/home/m/m301049/.conda/envs/main/bin/python /home/m/m301049/iwp_distributions/scripts/diagnose/era5/hists.py $1 $2

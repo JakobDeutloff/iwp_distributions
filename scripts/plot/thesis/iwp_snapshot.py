@@ -167,67 +167,6 @@ fig.savefig('plots/thesis/icon_ccic_iwp.pdf', bbox_inches='tight', dpi=400)
 
 
 # %% make plot for thesis cover
-# %% plot ccic and icon in one plot 
-
-cmap_white = LinearSegmentedColormap.from_list(
-    "white_alpha",
-    [
-        (1.0, 1.0, 1.0, 0.0),
-        (1.0, 1.0, 1.0, 1.0), 
-    ],
-)
-cmap_icon = LinearSegmentedColormap.from_list("white", ["#020640", (1, 1, 1, 1)])
-cmap_ccic = LinearSegmentedColormap.from_list("white", [(1, 1, 1, 1), "#023201"])
-projection = ccrs.PlateCarree()
-
-fig, axes = plt.subplots(2, 1, figsize=(12, 4.5), subplot_kw={"projection": projection})
-fig.set_dpi(400)
-fig.patch.set_facecolor("white")
-for ax in axes:
-    ax.set_extent([-180, 180, -30, 30], crs=ccrs.PlateCarree())
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for s in ax.spines.values():
-        s.set_visible(False)
-
-
-# plot icon
-cmap_white = cmap_white.copy()
-cmap_white.set_bad((1, 1, 1, 0))    # invalid (e.g. 0 in LogNorm) -> transparent
-cmap_white.set_under((1, 1, 1, 0))  # below vmin -> transparent
-axes[0].set_facecolor("#02022E") 
-xlims = axes[0].get_xlim()
-ylims = axes[0].get_ylim()
-im = egh.healpix_resample(
-    iwp_icon.values, xlims, ylims, nx, ny, axes[0].projection, "nearest", nest=True
-)
-im = im.fillna(0)
-vmin, vmax = 1e-3, 10
-norm = LogNorm(vmin=vmin, vmax=vmax)
-axes[0].imshow(im, extent=xlims + ylims, origin="lower", cmap=cmap_white, norm=norm)
-
-
-# plot ccic
-axes[1].pcolormesh(
-    mask["longitude"],
-    mask["latitude"],
-    mask,
-    cmap=LinearSegmentedColormap.from_list("white", ["#011E00", "#02022E",]), # two colors, one for land and one for sea
-    rasterized=True,
-    transform=ccrs.PlateCarree(),
-)
-im = axes[1].pcolormesh(
-    iwp["longitude"],
-    iwp["latitude"],
-    iwp.isel(time=0),
-    cmap=cmap_white,
-    norm=norm,
-    rasterized=True,
-    transform=ccrs.PlateCarree(),
-)
-
-fig.savefig('plots/thesis/icon_ccic_iwp_cover.pdf', dpi=400, bbox_inches='tight')
-# %% next try
 
 
 cmap_icon = LinearSegmentedColormap.from_list("white", [(1, 1, 1, 1), "#020640",])
@@ -269,4 +208,53 @@ im = axes[1].pcolormesh(
 )
 
 fig.savefig('plots/thesis/icon_ccic_iwp_cover.pdf', dpi=400, bbox_inches='tight')
+# %% plot for defense talk 
+
+cmap_icon = LinearSegmentedColormap.from_list("white", [(1, 1, 1, 1), "#020640",])
+projection = ccrs.PlateCarree()
+
+fig, axes = plt.subplots(1, 2, figsize=(7, 15), subplot_kw={"projection": projection})
+fig.set_dpi(200)
+fig.patch.set_facecolor("white")
+_, _, nx, ny = np.array(axes[0].bbox.bounds, dtype=int)
+for ax in axes:
+    ax.set_extent([-90, 90, -30, 30], crs=ccrs.PlateCarree())
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for s in ax.spines.values():
+        s.set_visible(False)
+
+
+# plot icon
+xlims = axes[0].get_xlim()
+ylims = axes[0].get_ylim()
+im = egh.healpix_resample(
+    iwp_icon.values, xlims, ylims, nx, ny, axes[0].projection, "nearest", nest=True
+)
+im = im.fillna(0)
+vmin, vmax = 1e-3, 10
+norm = LogNorm(vmin=vmin, vmax=vmax)
+axes[0].imshow(im, extent=xlims + ylims, origin="lower", cmap=cmap_icon, norm=norm)
+
+
+# plot ccic
+im = axes[1].pcolormesh(
+    iwp["longitude"],
+    iwp["latitude"],
+    iwp.isel(time=0),
+    cmap=cmap_icon,
+    norm=norm,
+    rasterized=True,
+    transform=ccrs.PlateCarree(),
+)
+
+axes[0].set_yticks([-30, 30])
+axes[0].set_yticklabels(['30°S', '30°N'], fontsize=8)
+axes[0].set_xticks([-90, 0, 90])
+axes[0].set_xticklabels(['90°W', '0°', '90°E'], fontsize=8)
+axes[1].set_xticks([-90, 0, 90])
+axes[1].set_xticklabels(['90°W', '0°', '90°E'], fontsize=8)
+
+
+fig.savefig('plots/thesis/icon_ccic_talk.pdf', dpi=200, bbox_inches='tight')
 # %%

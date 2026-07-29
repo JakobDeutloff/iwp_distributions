@@ -29,10 +29,10 @@ names = ["ccic", "gpm"]
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
 )
 cutoffs = {
     "ccic": {"iwp": slice(1e-1, None)},
@@ -104,7 +104,7 @@ def calc_feedback_bs(name='ccic', len_block=36):
     )  # 1/1
     area_change_bs = (slope_bs / 100) * area_fraction_bs  # 1/K
     feedback_2d_bs = -1 * (
-        (area_change_bs * SW_in * get_albedo(name)) - ((area_change_bs) * SW_in * 0.1)
+        (area_change_bs * SW_in * get_albedo(name)) - ((area_change_bs) * SW_in * 0.13)
     )  # W / m^2 / K
     return feedback_2d_bs
 
@@ -126,5 +126,5 @@ for n in n_iterations:
 
  # %%  save results
 import pickle
-with open("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d_sample_size_test.pkl", "wb") as f:
+with open("/work/bm1183/m301049/diurnal_cycle_publication/ccic_bootstrap_feedback_2d_sample_size_test.pkl", "wb") as f:
     pickle.dump(feedbacks_bs, f)

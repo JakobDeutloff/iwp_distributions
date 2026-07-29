@@ -28,10 +28,10 @@ names = ["ccic", "gpm"]
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
 )
 cutoffs = {
     "ccic": {"iwp": slice(1e-1, None)},
@@ -105,7 +105,7 @@ def calc_feedback_bs(seed, name='ccic', len_block=36):
     )  # 1/1
     area_change_bs = (slope_bs / 100) * area_fraction_bs  # 1/K
     feedback_2d_bs = -1 * (
-        (area_change_bs * SW_in * get_albedo(name)) - ((area_change_bs) * SW_in * 0.1)
+        (area_change_bs * SW_in * get_albedo(name)) - ((area_change_bs) * SW_in * 0.13)
     )  # W / m^2 / K
     return feedback_2d_bs
 
@@ -116,7 +116,7 @@ with ProcessPoolExecutor(max_workers=128) as executor:
         tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['ccic'] * n_iterations), total=n_iterations)
     )
 feedbacks = xr.concat(results, dim="iteration")
-feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d.nc")
+feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_publication/ccic_bootstrap_feedback_2d.nc")
 
 # %% calc feedback gpm
 # with ProcessPoolExecutor(max_workers=128) as executor:
@@ -124,6 +124,6 @@ feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_fee
 #         tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['gpm'] * n_iterations), total=n_iterations)
 #     )
 # feedbacks_gpm = xr.concat(results, dim="iteration")
-# feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc")
+# feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_publication/gpm_bootstrap_feedback_2d.nc")
 
 # %%

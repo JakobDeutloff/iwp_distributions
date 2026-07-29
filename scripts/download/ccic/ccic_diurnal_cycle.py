@@ -21,6 +21,12 @@ ds = xr.open_zarr(s3.get_mapper(files[0]))
 ds = ds.sel(latitude=slice(30, -30)).load()
 del s3
 
+# %% calculate weights
+weights_vals = np.cos(np.deg2rad(ds.latitude))
+# make weights a DataArray with lat and lon dims from ds
+weights_vals = np.repeat(weights_vals.values[:, np.newaxis], ds.longitude.size, axis=1)
+weights = xr.DataArray(weights_vals, dims=["latitude", "longitude"], coords={"latitude": ds.latitude, "longitude": ds.longitude})
+
 # %% configure mask
 if region == "sea":
     mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
@@ -65,8 +71,9 @@ def calc_2d_hist(file_path):
         ds["tiwp"].isel(time=0).where(mask).values.flatten(),
         bins=[bins_lt, bins_iwp],
         density=False,
+        weights=weights.where(mask).values.flatten()
     )
-    size_1 = np.isfinite(ds["tiwp"].isel(time=0).where(mask)).sum().item()
+    size_1 = weights.where(np.isfinite(ds["tiwp"].isel(time=0).where(mask))).sum().item()
     time_1 = ds["time"].isel(time=0).values
 
     hist_2, _, _ = np.histogram2d(
@@ -74,8 +81,9 @@ def calc_2d_hist(file_path):
         ds["tiwp"].isel(time=1).where(mask).values.flatten(),
         bins=[bins_lt, bins_iwp],
         density=False,
+        weights=weights.where(mask).values.flatten()
     )
-    size_2 = np.isfinite(ds["tiwp"].isel(time=1).where(mask)).sum().item()
+    size_2 = weights.where(np.isfinite(ds["tiwp"].isel(time=1).where(mask))).sum().item()
     time_2 = ds["time"].isel(time=1).values
     return hist_1, hist_2, size_1, size_2, time_1, time_2
 
@@ -101,7 +109,7 @@ hists = xr.Dataset(
 
 # %% save dataset
 path = os.path.join(
-    local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_{region}_{year}.nc"
+    local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_{region}_{year}_weighted.nc"
 )
 hists.to_netcdf(path)
 

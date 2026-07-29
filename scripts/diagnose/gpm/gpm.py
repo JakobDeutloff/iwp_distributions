@@ -16,6 +16,12 @@ region = sys.argv[2]
 files = glob.glob(f"{path}/merg_{year}*.nc4")
 ds = xr.open_dataset(files[0], engine='netcdf4').sel(lat=slice(-30,30))
 
+# %% calculate weights
+weights_vals = np.cos(np.deg2rad(ds.lat))
+# make weights a DataArray with lat and lon dims from ds
+weights_vals = np.repeat(weights_vals.values[:, np.newaxis], ds.lon.size, axis=1)
+weights = xr.DataArray(weights_vals, dims=["lat", "lon"], coords={"lat": ds.lat, "lon": ds.lon})
+
 #%% configure mask
 if region == "sea":
     mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
@@ -58,15 +64,17 @@ def calc_2d_hist(file_path):
         ds["Tb"].isel(time=0).where(mask).values.flatten(),
         bins=[bins_lt, bins_bt],
         density=False,
+        weights=weights.where(mask).values.flatten()
     )
-    size_1 = np.isfinite(ds["Tb"].isel(time=0).where(mask)).sum().item()
+    size_1 = weights.where(np.isfinite(ds["Tb"].isel(time=0).where(mask))).sum().item()
     H_2, _, _ = np.histogram2d(
         ds["local_time"].isel(time=1).where(mask).values.flatten(),
         ds["Tb"].isel(time=1).where(mask).values.flatten(),
         bins=[bins_lt, bins_bt],
         density=False,
+        weights=weights.where(mask).values.flatten()
     )
-    size_2 = np.isfinite(ds["Tb"].isel(time=1).where(mask)).sum().item()
+    size_2 = weights.where(np.isfinite(ds["Tb"].isel(time=1).where(mask))).sum().item()
     return H_1, H_2, size_1, size_2, ds['time'].values[0], ds['time'].values[1]
 
 # %%
@@ -91,7 +99,7 @@ hists = xr.Dataset(
 ).sortby("time")
 
 # %% save dataset
-out_path = f"/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_{region}_{year}.nc"
+out_path = f"/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_{region}_{year}_weighted.nc"
 if os.path.exists(out_path):
     os.remove(out_path)
 hists.to_netcdf(out_path)
