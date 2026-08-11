@@ -40,6 +40,7 @@ icon = (
     ).pipe(merge_grid)
 ).isel(time=0)
 
+# %%
 icon = to_healpix(icon)
 iwp_icon = (
     icon["clivi"] + icon["qsvi"] + icon["qgvi"]

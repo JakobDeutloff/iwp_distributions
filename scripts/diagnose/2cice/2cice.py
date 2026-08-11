@@ -49,7 +49,7 @@ cloudsat_xr = cloudsat_xr.assign(
     }
 )
 cloudsat_xr = cloudsat_xr.pipe(shift_longitudes, lon_name='lon')
-bins = np.logspace(-3, 2, 254)[::4]
+bins = np.logspace(-3, 2, 254)
 
 # %%
 lon_min_twp = 120
@@ -103,7 +103,7 @@ hists = xr.Dataset(
 )
 
 # %% save hists 
-path = '/work/bm1183/m301049/cloudsat/dists_no_dup.nc'
+path = '/work/bu1562/m301049/cloudsat/dists_no_dup_fine.nc'
 hists.to_netcdf(path)
 
 # %%

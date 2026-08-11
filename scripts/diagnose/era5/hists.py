@@ -15,9 +15,9 @@ year = sys.argv[1]
 region = sys.argv[2] 
 
 # %%
-ds_full = xr.open_dataset(f"/work/bm1183/m301049/era5/hourly/iwp_{year}.nc").pipe(shift_longitudes)
-ds_full['iwp'] = ds_full['tciw'] + ds_full['tcsw']
-ds_full = ds_full[['iwp']]
+ds_full = xr.open_dataset(f"/work/bu1562/m301049/era5/hourly/iwp_{year}.nc").pipe(shift_longitudes)
+ds_cf = xr.open_dataset(f"/work/bu1562/m301049/era5/hourly/cf_{year}.nc").pipe(shift_longitudes)
+ds_full['iwp'] = (ds_full['tciw'] + ds_full['tcsw']) / ds_cf['hcc']
 
 # %% calculate weights
 weights_vals = np.cos(np.deg2rad(ds_full.latitude))
@@ -72,7 +72,7 @@ def calc_2d_hist(day):
     density=False,
     weights=weights_sel.where(mask).values.flatten()
     )
-    size = weights_sel.where(np.isfinite(ds_sel["iwp"].where(mask))).sum().item()
+    size = weights_sel.where(np.isfinite(ds_full["tciw"].sel(valid_time=day).where(mask))).sum().item()
     return hist, size
 
 
@@ -99,7 +99,7 @@ hists_xr = xr.Dataset(
 ).sortby("time")
 
 # %% save dataset
-path = f"/work/bm1183/m301049/era5/diagnosed/iwp_hist_{region}_{year}_weighted.nc"
+path = f"/work/bu1562/m301049/era5/diagnosed/iwp_hist_{region}_{year}_weighted_cf.nc"
 hists_xr.to_netcdf(path)
 
 

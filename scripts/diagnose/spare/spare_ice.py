@@ -24,7 +24,7 @@ def open_spareice(path):
     return ds.load()
 
 def calc_histogram(ds):
-    bins = np.logspace(-3, 2, 254)[::4]
+    bins = np.logspace(-3, 2, 254)
     centers = 0.5 * (bins[1:] + bins[:-1])
     # get histogram in tropics
     iwp_hist = ds['IWP_lat_hist'].sel(lat_center=slice(-30, 30)).sum(['lat_center'])
@@ -61,9 +61,7 @@ years = [str(i) for i in range(2007, 2026)]
 satellites = {year: "metopb" if int(year) >= 2020 else "metopa" for year in years}
 
 # %%
-process_year('2020')
-# %%
-with ProcessPoolExecutor(max_workers=19) as executor:
+with ProcessPoolExecutor(max_workers=5) as executor:
     # Use tqdm to show progress
     tqdm.pandas(desc="Processing years")
     # Process each year in parallel
@@ -74,5 +72,5 @@ with ProcessPoolExecutor(max_workers=19) as executor:
 data_all = xr.concat(data, dim='time')
 
 # %%
-data_all.to_netcdf('/work/bm1183/m301049/spareice/hists_metop.nc')
+data_all.to_netcdf('/work/bu1562/m301049/spareice/hists_metop_fine.nc')
 # %%

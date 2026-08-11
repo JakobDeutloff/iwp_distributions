@@ -43,7 +43,6 @@ local_dir = f"/work/bm1183/m301049/ccic_daily_cycle/{year}/"
 os.makedirs(local_dir, exist_ok=True)
 bins_lt = np.arange(0, 25, 1)
 bins_iwp = np.logspace(-3, 2, 254)
-bins_iwp = np.insert(bins_iwp, 0, 0)
 
 def calc_2d_hist(file_path):
     s3 = s3fs.S3FileSystem(anon=True)
@@ -109,7 +108,7 @@ hists = xr.Dataset(
 
 # %% save dataset
 path = os.path.join(
-    local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_{region}_{year}_weighted.nc"
+    local_dir, f"ccic_cpcir_daily_cycle_distribution_2d_{region}_{year}_weighted_noz.nc"
 )
 hists.to_netcdf(path)
 

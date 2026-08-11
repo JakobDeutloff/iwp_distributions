@@ -1,4 +1,3 @@
-from matplotlib.pyplot import hist
 import numpy as np
 import xarray as xr
 from scipy.signal import detrend
@@ -66,7 +65,7 @@ def shift_longitudes(ds, lon_name="longitude"):
 
 
 def read_ccic_dc(filename):
-    path = "/work/bm1183/m301049/ccic_daily_cycle/"
+    path = "/work/bu1562/m301049/ccic_daily_cycle/"
     years = range(2000, 2024)
     months = [f"{i:02d}" for i in range(1, 13)]
     hist_list = []
@@ -219,7 +218,7 @@ def lowpass_filter(da, cutoff_period_years=3):
 def read_era5_vars(mode="all"):
 
     if mode == "all":
-        path = "/work/bm1183/m301049/era5/monthly"
+        path = "/work/bu1562/m301049/era5/monthly"
         vars = ["t", "p", "rad_tendency", "stability", "subsidence", "convergence"]
         dataarrays = [
             xr.open_dataarray(f"{path}/{var}.nc", chunks={}, decode_timedelta=False)
@@ -230,7 +229,7 @@ def read_era5_vars(mode="all"):
         ]
         ds_merged = xr.merge(dataarrays_uni, compat="override")
     else:
-        path = "/work/bm1183/m301049/era5/monthly/averages"
+        path = "/work/bu1562/m301049/era5/monthly/averages"
         vars = ["t", "p", "rad", "stability", "subsidence", "convergence"]
         dataarrays = [
             xr.open_dataarray(
@@ -281,29 +280,159 @@ def calculate_jj_sum(hist):
     return hist_jj
 
 
-def load_histograms(freq="1ME"):
-    hists = {}
-    hists["ccic"] = xr.open_dataset(
-        "/work/bm1183/m301049/ccic/hists/ccic_monthly_hist_interpolated.nc"
-    )
+def load_histograms(set="all", freq="1ME"):
+
+    # observations
+    hists_obs = {}
     hist_2d = xr.open_dataset(
-        "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+        "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
     )
-    hists["ccic"]["size"] = hist_2d["size"]
-    hists["two_c_ice"] = xr.open_dataset(
-        "/work/bm1183/m301049/cloudsat/dists_no_dup.nc"
+    hists_obs["ccic"] = hist_2d.sum("local_time")
+    hists_obs["ccic"]["hist"][:, 0] = hists_obs["ccic"]["hist"][:, 1]
+    hists_obs["two_c_ice"] = xr.open_dataset(
+        "/work/bu1562/m301049/cloudsat/dists_no_dup_fine.nc"
     )
-    hists["dardar"] = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
-    hists["spare_ice"] = xr.open_dataset(
-        "/work/bm1183/m301049/spareice/hists_metop.nc"
+    hists_obs["two_c_ice"] = (
+        hists_obs["two_c_ice"].coarsen(bin_center=4, boundary="trim").sum()
+    )
+    hists_obs["dardar"] = xr.open_dataset(
+        "/work/bu1562/m301049/dardarv3.10/hist_dardar_fine.nc"
+    )
+    hists_obs["dardar"] = (
+        hists_obs["dardar"].coarsen(bin_center=4, boundary="trim").sum()
+    )
+    hists_obs["spare_ice"] = xr.open_dataset(
+        "/work/bu1562/m301049/spareice/hists_metop_fine.nc"
     ).sel(time=slice(None, "2025-07"))
-    for key in hists.keys():
-        hists[key] = hists[key].resample(time=freq).sum()
-        if "bin_center" in hists[key].dims:
-            hists[key] = hists[key].rename({"bin_center": "iwp"})
-        hists[key] = hists[key].transpose("time", "iwp")
-        hists[key]["time"] = pd.to_datetime(hists[key]["time"].dt.strftime("%Y-%m"))
-    return hists
+    hists_obs["spare_ice"] = (
+        hists_obs["spare_ice"].coarsen(bin_center=4, boundary="trim").sum()
+    )
+    for key in hists_obs.keys():
+        hists_obs[key] = hists_obs[key].resample(time=freq).sum()
+        if "bin_center" in hists_obs[key].dims:
+            hists_obs[key] = hists_obs[key].rename({"bin_center": "iwp"})
+        hists_obs[key] = hists_obs[key].transpose("time", "iwp")
+        hists_obs[key]["time"] = pd.to_datetime(
+            hists_obs[key]["time"].dt.strftime("%Y-%m")
+        )
+
+    # icon AP
+    hists_model = {}
+    names = {
+        "icon_ap_control": "control",
+        "icon_ap_plus4K": "plus4K",
+        "icon_ap_plus2K": "plus2K",
+    }
+    for name, run in names.items():
+        hists_model[name] = xr.open_dataset(
+            f"/work/bu1562/m301049/icon_hcap_data/{run}/production/daily_cycle_hist_weighted.nc"
+        )
+        hists_model[name] = hists_model[name].sum(["local_time", "time"])
+        hists_model[name] = hists_model[name].coarsen(iwp=4, boundary="trim").sum()
+        hists_model[name] = hists_model[name]["hist"] / hists_model[name]["size"]
+
+    # icon AMIP
+    icon_amip_cont = (
+        xr.open_dataset(
+            "/work/bu1562/m301049/icon-amip/histogram_iwp_ctrl_20200401_20200831.nc"
+        )
+        .sel(domain="land_ocean")
+        .rename({"iwp_bin": "iwp"})["pdf"]
+        .drop_vars("domain")
+    )
+    icon_amip_4k = (
+        xr.open_dataset(
+            "/work/bu1562/m301049/icon-amip/histogram_iwp_sst4k_20200401_20200831.nc"
+        )
+        .sel(domain="land_ocean")
+        .rename({"iwp_bin": "iwp"})["pdf"]
+        .drop_vars("domain")
+    )
+    hists_model["icon_amip_control"] = (
+        icon_amip_cont.coarsen(iwp=4, boundary="trim").sum() / icon_amip_cont.sum() / 3
+    )
+    hists_model["icon_amip_plus4K"] = (
+        icon_amip_4k.coarsen(iwp=4, boundary="trim").sum() / icon_amip_4k.sum() / 3
+    )
+
+    # rcemip
+    ds = xr.open_dataset(
+        "/work/bm1183/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
+    )
+    ds["fwp"] = ds["fwp"] * 1e-3
+    rcemip_pdf = interpolate_bins(
+        ds["f"].mean("model"), np.logspace(-3, 2, 254)[::4], "fwp"
+    )
+    hists_model["rcemip_control"] = rcemip_pdf.sel(SST=295)
+    hists_model["rcemip_plus10K"] = rcemip_pdf.sel(SST=305)
+
+    # xshield
+    xshield_cont = xr.open_dataset(
+        "/work/bm1183/m301049/xshield/xshield24v2_iw_histogram.nc"
+    )
+    xshield_4k = xr.open_dataset(
+        "/work/bm1183/m301049/xshield/xshield24v2_PLUS_4K_iw_histogram.nc"
+    )
+    hists_model["xshield_control"] = xshield_cont["f"]
+    hists_model["xshield_plus4K"] = xshield_4k["f"]
+
+    # unify iwp axis
+    for key in hists_model.keys():
+        hists_model[key]["iwp"] = hists_obs["dardar"]["iwp"]
+    for key in hists_obs.keys():
+        hists_obs[key]["iwp"] = hists_obs["dardar"]["iwp"]
+
+    # package them as xarray datasets and unify
+    hists = {}
+    if set == "all":
+        hists_obs["two_c_ice"] = hists_obs["two_c_ice"].where(
+            hists_obs["two_c_ice"]["size"] > 1.9e6
+        )
+        hists_obs["dardar"] = hists_obs["dardar"].where(
+            hists_obs["dardar"]["size"] > 1.9e6
+        )
+        for key in hists_obs.keys():
+            hists[key] = hists_obs[key]["hist"] / hists_obs[key]["size"]
+        for key in hists_model.keys():
+            hists[key] = hists_model[key]
+        return hists
+    elif set == "obs":
+        for key in hists_obs.keys():
+            hists[key] = hists_obs[key]
+        return hists
+    elif set == "model":
+        for key in hists_model.keys():
+            hists[key] = hists_model[key]
+        return hists
+    else:
+        raise ValueError("Invalid set specified. Choose from 'all', 'obs', or 'model'.")
+
+
+def load_slopes():
+    slopes = xr.open_dataset("/work/bu1562/m301049/iwp_dists/slopes_monthly.nc")
+    errors = xr.open_dataset("/work/bu1562/m301049/iwp_dists/errors_monthly.nc")
+    p_vals = xr.open_dataset("/work/bu1562/m301049/iwp_dists/p_vals_monthly.nc")
+    return slopes, errors, p_vals
+
+
+def load_cre():
+    cre = xr.open_dataset(
+        f"/work/bm1183/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
+    )
+    hists = load_histograms("obs")
+    cre["iwp"] = np.log10(cre["iwp"])
+    cre = cre.interp(iwp=np.log10(hists["ccic"].iwp), method="linear").drop_vars("iwp")
+    cre["iwp"] = hists["ccic"].iwp
+    return cre
+
+
+def load_feedbacks():
+    feedback = xr.open_dataset("/work/bu1562/m301049/iwp_dists/feedback.nc")
+    feedback_area = xr.open_dataset("/work/bu1562/m301049/iwp_dists/feedback_area.nc")
+    feedback_opacity = xr.open_dataset(
+        "/work/bu1562/m301049/iwp_dists/feedback_opacity.nc"
+    )
+    return feedback, feedback_area, feedback_opacity
 
 
 runs = ["jed0011", "jed0022", "jed0033"]
@@ -328,16 +457,16 @@ def load_random_datasets(version="processed"):
     if version == "processed":
         for run in runs:
             datasets[run] = xr.open_dataset(
-                f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample_processed_64.nc"
+                f"/work/bu1562/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample_processed_64.nc"
             )
     elif version == "temp":
         for run in runs:
             datasets[run] = xr.open_dataset(
-                f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample_tgrid_20.nc"
+                f"/work/bu1562/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample_tgrid_20.nc"
             )
     else:
         for run in runs:
             datasets[run] = xr.open_dataset(
-                f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample.nc"
+                f"/work/bu1562/m301049/icon_hcap_data/{experiments[run]}/production/random_sample/{run}_randsample.nc"
             )
     return datasets

@@ -90,34 +90,46 @@ def plot_hists(hists, temp, bins):
 def definitions():
 
     colors = {
-        "icon": "#1f948a",
-        "rcemip": "#ff7f0e",
+        "icon_ap_control": "#1f948a",
+        "rcemip_control": "#ff7f0e",
         "dardar": "brown",
         "two_c_ice": "k",
         "ccic": "purple",
         "spare_ice": "darkgreen",
-        "xshield": "#FB06BA",
+        "xshield_control": "#FB06BA",
+        "era5": "#03DD6C",
+        'icon_amip_control': "#2B01FA",
     }
 
     labels = {
-        "icon": "ICON AP",
-        "rcemip": "RCEMIP",
+        "icon_ap_control": "ICON AP",
+        "rcemip_control": "RCEMIP",
         "dardar": "DARDAR",
         "two_c_ice": "2C-ICE",
         "ccic": "CCIC",
         "spare_ice": "SPARE-ICE",
-        "xshield": "X-SHiELD",
+        "xshield_control": "X-SHiELD AMIP",
+        "era5": "ERA5",
+        'icon_amip_control': "ICON AMIP",
     }
 
     linestyles = {
-        "icon": "--",
-        "rcemip": "--",
+        "icon_ap_control": "--",
+        "rcemip_control": "--",
         "dardar": "-",
         "two_c_ice": "-",
         "ccic": "-",
         "spare_ice": "-",
-        "xshield": "--",
+        "xshield_control": "--",
+        "era5": "-",
+        'icon_amip_control': "--",
     }
+
+    # use same identifyers for cahnge in simulations
+    for name in ['rcemip', 'icon_ap', 'xshield', 'icon_amip']:
+        colors[name] = colors[f"{name}_control"]
+        labels[name] = labels[f"{name}_control"]
+        linestyles[name] = linestyles[f"{name}_control"]
 
     return colors, labels, linestyles
 

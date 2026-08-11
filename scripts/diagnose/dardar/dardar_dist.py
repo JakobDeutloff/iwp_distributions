@@ -12,8 +12,6 @@ batch_idxs = np.arange(0, 10)
 
 # %% open land-sea mask and define subregions 
 mask = xr.open_dataset('/work/bm1183/m301049/orcestra/sea_land_mask.nc').pipe(shift_longitudes, lon_name='lon')
-lon_min_twp = 120
-lon_max_twp = 180
 
 # %% open dataset
 def calc_histogram(year, batch_idx):
@@ -26,13 +24,13 @@ def calc_histogram(year, batch_idx):
     mask_daytime = (local_time >= 6) & (local_time <= 18)
     mask_geo = (ds['latitude'] >= -30) & (ds['latitude'] <= 30)
     mask_sea = mask['mask'].sel(lon=ds['longitude'], lat=ds['latitude'], method='nearest')
-    ds_selection = ds.where(mask_geo & mask_daytime & mask_sea, drop=True)
+    ds_selection = ds.where(mask_geo & mask_daytime, drop=True)
     # calculate histogram
     hist_list = []
     size_list = []
     time_stamps = []
     for day in days:
-        bins = bins = np.logspace(-3, 2, 254)[::4]
+        bins = bins = np.logspace(-3, 2, 254)
         len_data = np.isfinite(ds_selection['iwp'].sel(time=day)).sum()
         hist, _ = np.histogram(ds_selection['iwp'].sel(time=day).values, bins=bins, density=False)
         hist_list.append(hist)
@@ -71,5 +69,5 @@ histogram = histogram.groupby('time').sum()
 histogram['hist'] = histogram['hist'].transpose('bin_center', 'time')
 
 # %% save
-histogram.to_netcdf('/work/bm1183/m301049/dardarv3.10/hist_dardar_sea.nc')
+histogram.to_netcdf('/work/bu1562/m301049/dardarv3.10/hist_dardar_fine.nc')
 # %%
