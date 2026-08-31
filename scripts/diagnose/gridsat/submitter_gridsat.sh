@@ -3,7 +3,7 @@
 #SBATCH --output=spare.o%j # name for standard output log file
 #SBATCH --error=spare.e%j # name for standard error output log
 #SBATCH --partition=compute
-#SBATCH --account=bm1183
+#SBATCH --account=bu1562
 #SBATCH --nodes=1
 #SBATCH --time=00:05:00
 #SBATCH --mem=0

@@ -70,7 +70,7 @@ with ProgressBar():
         ds.convergence.sel(hybrid=slice(60, 95)).idxmax(dim="hybrid").load()
     )  # disregard maxima at the edges of the domain
 max_d_level.to_netcdf(
-    "/work/bm1183/m301049/era5/monthly/level_of_max_convergence_60_95hPa.nc"
+    "/work/bu1562/m301049/era5/monthly/level_of_max_convergence_60_95hPa.nc"
 )
 
 # %%
@@ -81,7 +81,7 @@ with ProgressBar():
         .where((max_d_level > 60) & (max_d_level < 95))
         .load()
     )
-max_d.to_netcdf("/work/bm1183/m301049/era5/monthly/max_convergence_60_95hPa.nc")
+max_d.to_netcdf("/work/bu1562/m301049/era5/monthly/max_convergence_60_95hPa.nc")
 
 # %%
 with ProgressBar():
@@ -91,6 +91,6 @@ with ProgressBar():
         .load()
     )
 stability_d.to_netcdf(
-    "/work/bm1183/m301049/era5/monthly/stability_at_max_convergence_60_95hPa.nc"
+    "/work/bu1562/m301049/era5/monthly/stability_at_max_convergence_60_95hPa.nc"
 )
 # %%

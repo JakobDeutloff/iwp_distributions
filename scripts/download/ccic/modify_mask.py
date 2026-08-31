@@ -7,7 +7,7 @@ import cartopy.crs as ccrs
 from tqdm import tqdm
 
 # %%
-mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+mask = xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc")
 
 
 # %%
@@ -124,7 +124,10 @@ def remove_small_islands(mask_data, size_threshold=50):
 mask_big_cluster = remove_small_islands(mask, size_threshold=2000)
 # %% Apply the buffer
 modified_mask = create_land_buffer(
-    mask_big_cluster, mask_big_cluster.lat.values, mask_big_cluster.lon.values, buffer_km=1000
+    mask_big_cluster,
+    mask_big_cluster.lat.values,
+    mask_big_cluster.lon.values,
+    buffer_km=1000,
 )
 
 # %% coarsen masks for plotting
@@ -162,7 +165,7 @@ trop_ocean_modified = (modified_mask.sel(lat=slice(-30, 30)) == 1).mean().item()
 print(f"Original tropical ocean fraction: {trop_ocean:.3f}")
 print(f"Modified tropical ocean fraction: {trop_ocean_modified:.3f}")
 
-# %% save modified mask 
-modified_mask.to_netcdf("/work/bm1183/m301049/orcestra/modified_sea_land_mask_1000.nc")
+# %% save modified mask
+modified_mask.to_netcdf("/work/bu1562/m301049/orcestra/modified_sea_land_mask_1000.nc")
 
 # %%

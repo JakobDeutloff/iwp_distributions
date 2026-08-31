@@ -16,7 +16,7 @@ import s3fs
 # %% load aquaplanet data and iwp and bt data
 bts = (
     xr.open_mfdataset(
-        "/work/bm1183/m301049/GPM_MERGIR/merg_2022010122*.nc4", engine="netcdf4"
+        "/work/bu1562/m301049/GPM_MERGIR/merg_2022010122*.nc4", engine="netcdf4"
     )
     .sel(lat=slice(-30, 30))
     .load()
@@ -47,7 +47,7 @@ iwp_icon = (
 ).load()
 
 # %% land sea mask 
-mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+mask = xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc")
 mask = mask.sel(lat=slice(-30, 30)).load()
 mask = mask.sel(
         lon=ds["longitude"], lat=ds["latitude"], method="nearest"

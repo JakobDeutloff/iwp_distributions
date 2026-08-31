@@ -20,7 +20,6 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import matplotlib.pyplot as plt
 
-
 # %% load ccic and gpm data
 colors, line_labels, linestyles = definitions()
 color = {"ccic": "black", "gpm": "orange", "icon": "green"}
@@ -28,21 +27,25 @@ names = ["ccic", "gpm"]
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
 )
 cutoffs = {
     "ccic": {"iwp": slice(1e-1, None)},
     "gpm": {"bt": slice(190, 260)},
 }
 SW_in = xr.open_dataarray(
-    "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
+    "/work/bu1562/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
 )
 SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")
-albedo_iwp = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc')['hc_albedo']
-albedo_bt = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc')['hc_albedo']
+albedo_iwp = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc"
+)["hc_albedo"]
+albedo_bt = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc"
+)["hc_albedo"]
 albedo = {
     "ccic": albedo_iwp,
     "gpm": albedo_bt,
@@ -54,7 +57,7 @@ for name in names:
     albedo[name] = albedo[name].sel(cutoffs[name])
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %%
 hists_monthly = {}
@@ -71,6 +74,7 @@ for name in names:
 
 # %%
 
+
 def get_albedo(name):
     offset = np.random.uniform(-0.2, 0.2)
     albedo_rand = albedo[name] + (offset * albedo[name])
@@ -78,21 +82,17 @@ def get_albedo(name):
     return albedo_rand
 
 
-def calc_feedback_bs(seed, name='ccic', len_block=36):
+def calc_feedback_bs(seed, name="ccic", len_block=36):
 
     n_sample = hists_detrend[name].time.size
     n_blocks = int(hists_monthly[name].time.size / len_block)
-    max_idx_block = n_sample-len_block
+    max_idx_block = n_sample - len_block
     np.random.seed(seed)
     block_idxs = np.random.randint(0, max_idx_block, n_blocks)
     time_idx = []
 
     for i in block_idxs:
-        time_idx.extend(
-            list(
-                range(i, i+len_block)
-            )  # create list of time indices
-        )
+        time_idx.extend(list(range(i, i + len_block)))  # create list of time indices
     slope_bs, _ = regress_hist_temp_2d(
         hists_detrend[name].isel(time=time_idx),
         temp_detrend,
@@ -109,14 +109,22 @@ def calc_feedback_bs(seed, name='ccic', len_block=36):
     )  # W / m^2 / K
     return feedback_2d_bs
 
+
 # %% calc feedback ccic
 n_iterations = 2000
 with ProcessPoolExecutor(max_workers=128) as executor:
     results = list(
-        tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['ccic'] * n_iterations), total=n_iterations)
+        tqdm(
+            executor.map(
+                calc_feedback_bs, range(n_iterations), ["ccic"] * n_iterations
+            ),
+            total=n_iterations,
+        )
     )
 feedbacks = xr.concat(results, dim="iteration")
-feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_publication/ccic_bootstrap_feedback_2d.nc")
+feedbacks.to_netcdf(
+    "/work/bu1562/m301049/diurnal_cycle_publication/ccic_bootstrap_feedback_2d.nc"
+)
 
 # %% calc feedback gpm
 # with ProcessPoolExecutor(max_workers=128) as executor:
@@ -124,6 +132,6 @@ feedbacks.to_netcdf("/work/bm1183/m301049/diurnal_cycle_publication/ccic_bootstr
 #         tqdm(executor.map(calc_feedback_bs, range(n_iterations), ['gpm'] * n_iterations), total=n_iterations)
 #     )
 # feedbacks_gpm = xr.concat(results, dim="iteration")
-# feedbacks_gpm.to_netcdf("/work/bm1183/m301049/diurnal_cycle_publication/gpm_bootstrap_feedback_2d.nc")
+# feedbacks_gpm.to_netcdf("/work/bu1562/m301049/diurnal_cycle_publication/gpm_bootstrap_feedback_2d.nc")
 
 # %%

@@ -3,7 +3,7 @@
 #SBATCH --output=master_dardar.o%j # name for standard output log file
 #SBATCH --error=master_dardar.e%j # name for standard error output log
 #SBATCH --partition=shared
-#SBATCH --account=bm1183
+#SBATCH --account=bu1562
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
 #SBATCH --mem=1GB

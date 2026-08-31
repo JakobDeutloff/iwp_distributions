@@ -8,21 +8,21 @@ import sys
 import os
 
 # %% configure
-path = "/work/bm1183/m301049/GPM_MERGIR/"
+path = "/work/bu1562/m301049/GPM_MERGIR/"
 year = sys.argv[1]
 region = sys.argv[2]
 
 # %% load first timestep of data
 files = glob.glob(f"{path}/merg_{year}*.nc4")
-ds = xr.open_dataset(files[0], engine='netcdf4')
+ds = xr.open_dataset(files[0], engine="netcdf4")
 ds = ds.where((ds.lat < -30) | (ds.lat > 30))
 
-#%% configure mask
+# %% configure mask
 if region == "sea":
-    mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc").load()
-    mask = mask.sel(lon=ds.lon, lat=ds.lat, method='nearest')
-    mask['lon'] = ds['lon']
-    mask['lat'] = ds['lat']
+    mask = xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc").load()
+    mask = mask.sel(lon=ds.lon, lat=ds.lat, method="nearest")
+    mask["lon"] = ds["lon"]
+    mask["lat"] = ds["lat"]
 elif region == "all":
     mask = True
 else:
@@ -37,19 +37,21 @@ bins_lt = np.arange(0, 25, 1)
 
 def calc_2d_hist(file_path):
 
-    ds = xr.open_dataset(file_path, engine='netcdf4')
+    ds = xr.open_dataset(file_path, engine="netcdf4")
     ds = ds.where((ds.lat < -30) | (ds.lat > 30))
 
     local_time = (
         ds["time"].dt.hour + (ds["time"].dt.minute / 60) + (ds["lon"] / 15)
     ) % 24
-    local_time = local_time.expand_dims({"lat": ds["lat"]}).transpose("time", "lat", "lon")
+    local_time = local_time.expand_dims({"lat": ds["lat"]}).transpose(
+        "time", "lat", "lon"
+    )
 
     ds = ds.assign(
         {
             "local_time": (
-                ("time", "lat", "lon"), local_time.values
-                ,
+                ("time", "lat", "lon"),
+                local_time.values,
             ),
         }
     )
@@ -67,7 +69,8 @@ def calc_2d_hist(file_path):
         density=False,
     )
     size_2 = np.isfinite(ds["Tb"].isel(time=1).where(mask)).sum().item()
-    return H_1, H_2, size_1, size_2, ds['time'].values[0], ds['time'].values[1]
+    return H_1, H_2, size_1, size_2, ds["time"].values[0], ds["time"].values[1]
+
 
 # %%
 with ProcessPoolExecutor(max_workers=128) as executor:
@@ -91,7 +94,9 @@ hists = xr.Dataset(
 ).sortby("time")
 
 # %% save dataset
-out_path = f"/work/bm1183/m301049/GPM_MERGIR/hists/gpm_extratropics_2d_hist_{region}_{year}.nc"
+out_path = (
+    f"/work/bu1562/m301049/GPM_MERGIR/hists/gpm_extratropics_2d_hist_{region}_{year}.nc"
+)
 if os.path.exists(out_path):
     os.remove(out_path)
 hists.to_netcdf(out_path)

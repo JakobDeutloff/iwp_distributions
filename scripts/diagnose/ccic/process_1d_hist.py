@@ -3,8 +3,9 @@ import xarray as xr
 import pandas as pd
 from src.helper_functions import interpolate_bins
 import numpy as np
+
 # %% open CCIC
-path = "/work/bm1183/m301049/ccic/"
+path = "/work/bu1562/m301049/ccic/"
 years = range(2000, 2024)
 months = [f"{i:02d}" for i in range(1, 13)]
 hist_list = []
@@ -26,11 +27,13 @@ hist_monthly = hist.resample(time="1ME").sum()
 hist_monthly["time"] = pd.to_datetime(hist_monthly["time"].dt.strftime("%Y-%m"))
 
 
-# %% interpolate bins to match other hists 
+# %% interpolate bins to match other hists
 new_bins = np.logspace(-3, 2, 254)[::4]
 hist_monthly_interp = interpolate_bins(hist_monthly, new_bins, "iwp")
 
 # %% save the interpolated histogram
-hist_monthly_interp.to_netcdf("/work/bm1183/m301049/ccic/hists/ccic_monthly_hist_interpolated.nc")
+hist_monthly_interp.to_netcdf(
+    "/work/bu1562/m301049/ccic/hists/ccic_monthly_hist_interpolated.nc"
+)
 
 # %%

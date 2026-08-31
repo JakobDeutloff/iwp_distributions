@@ -10,7 +10,7 @@ from scipy.signal import detrend
 
 # %%
 ds = read_era5_vars(mode="mean").load()
-t_surf = xr.open_dataarray("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").load()
+t_surf = xr.open_dataarray("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").load()
 t_surf = t_surf.sel(time=ds.time)
 ds_icon = load_random_datasets(version="temp")
 runs = list(ds_icon.keys())
@@ -163,7 +163,7 @@ ax.plot(
     stab_regression * 1e5,
     stab_regression["temp"],
     color="black",
-    label="ERA5 Internal variability"
+    label="ERA5 Internal variability",
 )
 ax.invert_yaxis()
 ax.plot(
@@ -171,7 +171,7 @@ ax.plot(
     stab_cold["temp"],
     color="red",
     linestyle="dashed",
-    label="ERA5 warm - cold"
+    label="ERA5 warm - cold",
 )
 ax.set_xlim([-5, 10])
 ax.set_ylim([260, 200])

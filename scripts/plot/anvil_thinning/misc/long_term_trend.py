@@ -11,12 +11,12 @@ from src.helper_functions import nan_detrend, interpolate_bins, load_histograms
 # %% initialize containers
 bins = np.logspace(-3, 2, 254)[::4]
 colors, line_labels, linestyles = definitions()
-hists = load_histograms()
+hists = load_histograms(set="obs")
 hists.pop("dardar")
 hists.pop("two_c_ice")
 
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
 ).sum("local_time")
 
 
@@ -26,7 +26,7 @@ for key in hists.keys():
     hists_normalized[key] = hists[key]["hist"] / hists[key]["size"]
 
 # %% load era5 surface temp
-t_mean = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+t_mean = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %% plot all hists
 plot_hists(hists_normalized["ccic"], t_mean, bins)

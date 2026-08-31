@@ -10,7 +10,7 @@ import pickle
 hist_era5 = {}
 for region in ["sea", "all"]:
     hist_era5[region] = xr.open_dataset(
-        f"/work/bm1183/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_{region}.nc"
+        f"/work/bu1562/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_{region}.nc"
     )
 hist_era5["land"] = hist_era5["all"] - hist_era5["sea"]
 hists = load_histograms()
@@ -20,11 +20,11 @@ bins_iwp = np.logspace(-3, 2, 254)[::4]
 
 # %% load icon histogram
 cre = xr.open_dataset(
-    f"/work/bm1183/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
+    f"/work/bu1562/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
 )
 
 with open(
-    f"/work/bm1183/m301049/icon_hcap_data/control/production/jed0011_iwp_hist.pkl",
+    f"/work/bu1562/m301049/icon_hcap_data/control/production/jed0011_iwp_hist.pkl",
     "rb",
 ) as f:
     hist_icon = pickle.load(f)
@@ -38,14 +38,14 @@ hist_icon_int = interpolate_bins(hist_icon, bins_iwp, "iwp")
 
 # %% load rcemip data
 ds = xr.open_dataset(
-    "/work/bm1183/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
+    "/work/bu1562/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
 )
 ds["fwp"] = ds["fwp"] * 1e-3
 rcemip_pdf = interpolate_bins(ds["f"].mean("model"), bins_iwp, "fwp")
 
 # %% load xshield data
 xshield_cont = xr.open_dataset(
-    "/work/bm1183/m301049/xshield/xshield24v2_iw_histogram.nc"
+    "/work/bu1562/m301049/xshield/xshield24v2_iw_histogram.nc"
 )
 
 # %% plot hist
@@ -112,11 +112,15 @@ fraction_dc_ccic = (
     / hists["ccic"]["size"].sel(time="2016").sum()
 )
 
-mean_hist = hist_era5["all"]['hist'].sel(time='2016').sum(['time', 'local_time']) / hist_era5["all"]['size'].sel(time='2016').sum('time')
+mean_hist = hist_era5["all"]["hist"].sel(time="2016").sum(
+    ["time", "local_time"]
+) / hist_era5["all"]["size"].sel(time="2016").sum("time")
 # cumulative sum of hist starting from highest iwp
 area_era5 = mean_hist.sortby("iwp", ascending=False).cumsum("iwp")
 # find iwp where cumulative sum is equal to fraction of deep convective clouds in ccic
-iwp_threshold = area_era5.where(area_era5 >= fraction_dc_ccic).dropna("iwp")["iwp"].max().item()
+iwp_threshold = (
+    area_era5.where(area_era5 >= fraction_dc_ccic).dropna("iwp")["iwp"].max().item()
+)
 print(f"IWP threshold for deep convective clouds in ERA5: {iwp_threshold:.2f} kg m^-2")
 
 # %% diurnal cycle era5
@@ -133,11 +137,15 @@ for region in ["sea", "land"]:
         color=colors[region],
     )
 
-# %% 
+# %%
 # %% load albedo
-albedo_iwp = xr.open_dataset("/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc")
-albedo_bt = xr.open_dataset("/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc")
+albedo_iwp = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc"
+)
+albedo_bt = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc"
+)
 SW_in = xr.open_dataarray(
-    "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
+    "/work/bu1562/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
 )
 SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")

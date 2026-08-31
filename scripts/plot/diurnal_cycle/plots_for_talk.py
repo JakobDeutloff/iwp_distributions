@@ -13,11 +13,10 @@ from src.grid_helpers import to_healpix, merge_grid
 from matplotlib.colors import LogNorm, LinearSegmentedColormap
 import s3fs
 
-
 # %% load aquaplanet data and iwp and bt data
 bts = (
     xr.open_mfdataset(
-        "/work/bm1183/m301049/GPM_MERGIR/merg_2022010122*.nc4", engine="netcdf4"
+        "/work/bu1562/m301049/GPM_MERGIR/merg_2022010122*.nc4", engine="netcdf4"
     )
     .sel(lat=slice(-30, 30))
     .load()
@@ -46,7 +45,7 @@ iwp_icon = (
 ).load()
 
 
-# %% 
+# %%
 background = (1, 1, 1)
 white_cmap = LinearSegmentedColormap.from_list("white", [background, "#110734"])
 projection = ccrs.PlateCarree()
@@ -70,7 +69,7 @@ norm = LogNorm(vmin=vmin, vmax=vmax)
 
 ax.imshow(im, extent=xlims + ylims, origin="lower", cmap=white_cmap, norm=norm)
 ax.axis("off")
-fig.savefig('plots/diurnal_cycle/talk/icon_iwp.png', bbox_inches='tight', dpi=400)
+fig.savefig("plots/diurnal_cycle/talk/icon_iwp.png", bbox_inches="tight", dpi=400)
 
 # %% plot ccic
 fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={"projection": projection})
@@ -86,14 +85,14 @@ ax.pcolormesh(
     rasterized=True,
 )
 ax.axis("off")
-fig.savefig('plots/diurnal_cycle/talk/ccic_iwp.png', bbox_inches='tight', dpi=400)
+fig.savefig("plots/diurnal_cycle/talk/ccic_iwp.png", bbox_inches="tight", dpi=400)
 
-# %% plot bts 
+# %% plot bts
 fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={"projection": projection})
 fig.patch.set_facecolor("white")
 ax.set_facecolor("white")  # Turn off axes BEFORE plotting
 ax.set_extent([-180, 180, -30, 30], crs=ccrs.PlateCarree())
-bts=bts.coarsen(lon=2, lat=2, boundary='trim').mean()
+bts = bts.coarsen(lon=2, lat=2, boundary="trim").mean()
 ax.pcolormesh(
     bts["lon"],
     bts["lat"],
@@ -104,10 +103,10 @@ ax.pcolormesh(
     vmax=290,
 )
 ax.axis("off")
-fig.savefig('plots/diurnal_cycle/talk/bts_tb.png', bbox_inches='tight', dpi=400)
+fig.savefig("plots/diurnal_cycle/talk/bts_tb.png", bbox_inches="tight", dpi=400)
 
-# %% check for complete bt data 
-null = bts.sel(lat=slice(-30, 30)).isnull().sum(['lat', 'lon'])
-null['Tb'].plot()
-null['Tb'].idxmin('time')
+# %% check for complete bt data
+null = bts.sel(lat=slice(-30, 30)).isnull().sum(["lat", "lon"])
+null["Tb"].plot()
+null["Tb"].idxmin("time")
 # %%

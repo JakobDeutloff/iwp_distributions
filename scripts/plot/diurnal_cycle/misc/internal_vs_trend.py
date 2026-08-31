@@ -24,12 +24,14 @@ color = {
 }
 
 # %% open histograms
-hist_gpm = xr.open_mfdataset("/work/bm1183/m301049/GPM_MERGIR/hists/gpm_2d_hist_all*.nc").load()
+hist_gpm = xr.open_mfdataset(
+    "/work/bu1562/m301049/GPM_MERGIR/hists/gpm_2d_hist_all*.nc"
+).load()
 hist_gpm = hist_gpm.sel(bt=slice(None, 240)).sum("bt")
 hist_gpm_month = resample_histograms(hist_gpm)
 
 # %% load era5 surface temp
-temp_trop = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp_trop = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 
 # %%  detrend and deseasonalize
@@ -143,7 +145,8 @@ axes[1].scatter(
     color=color["internal"],
 )
 
-# %% 
+
+# %%
 def calculate_change(start, end, hist, temp):
 
     hist = hist.sel(time=slice(start, end))
@@ -164,23 +167,23 @@ def calculate_change(start, end, hist, temp):
 
     x = np.arange(temp_trend.time.size)
     res = linregress(x, temp_trend.values)
-    trend = res.slope * (x[-1]) - res.slope * (x[0]) 
+    trend = res.slope * (x[-1]) - res.slope * (x[0])
     difference = temp_internal.max().values - temp_internal.min().values
 
     return slope_trend, slope_internal, trend, difference
 
 
-# %% plot cahnge for different start and enddates 
+# %% plot cahnge for different start and enddates
 periods = [
-    (None, None), 
+    (None, None),
     ("2001-01", None),
     ("2002-01", None),
     ("2003-01", None),
     ("2004-01", None),
-    (None, '2023-01'),
-    (None, '2022-01'),
-    (None, '2021-01'),
-    (None, '2020-01'), 
+    (None, "2023-01"),
+    (None, "2022-01"),
+    (None, "2021-01"),
+    (None, "2020-01"),
 ]
 
 slopes_trend = []
@@ -196,11 +199,15 @@ for start, end in periods:
     trends.append(trend)
     differences.append(difference)
 
-temp_trend = lowpass_filter(temp_trop, cutoff_period_years=2).sel(time=hist_gpm_month.time)
-temp_internal = xr.DataArray(detrend(temp_trend, axis=0), coords=temp_trend.coords, dims=temp_trend.dims)
+temp_trend = lowpass_filter(temp_trop, cutoff_period_years=2).sel(
+    time=hist_gpm_month.time
+)
+temp_internal = xr.DataArray(
+    detrend(temp_trend, axis=0), coords=temp_trend.coords, dims=temp_trend.dims
+)
 # %% plot slopes for different periods
 fig, axes = plt.subplots(2, 1, figsize=(8, 6))
-#make alpha range from 0.5 to 1.0
+# make alpha range from 0.5 to 1.0
 alpha = np.linspace(1.0, 0.2, len(periods))
 
 for i, (slope_trend, slope_internal) in enumerate(zip(slopes_trend, slopes_internal)):
@@ -208,13 +215,13 @@ for i, (slope_trend, slope_internal) in enumerate(zip(slopes_trend, slopes_inter
         hist_gpm["local_time"],
         slope_trend,
         label=f"from {periods[i][0] or 'start'} to {periods[i][1] or 'end'}",
-        color='k',
+        color="k",
         alpha=alpha[i],
     )
     axes[0].plot(
         hist_gpm["local_time"],
         slope_internal,
-        color='red',
+        color="red",
         alpha=alpha[i],
     )
 axes[1].plot(
@@ -237,9 +244,13 @@ axes[1].set_ylabel("T' / K")
 for ax in axes:
     ax.spines[["top", "right"]].set_visible(False)
 handles, labels = axes[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.12))
+fig.legend(handles, labels, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.12))
 fig.tight_layout()
-fig.savefig("plots/diurnal_cycle/sensitivity/slopes_all_periods.png", dpi=300, bbox_inches="tight")
+fig.savefig(
+    "plots/diurnal_cycle/sensitivity/slopes_all_periods.png",
+    dpi=300,
+    bbox_inches="tight",
+)
 
 # %%
 print(f"Mean trend in T: {np.mean(trends):.2f} K")

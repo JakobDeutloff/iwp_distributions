@@ -3,7 +3,7 @@
 #SBATCH --output=era5_mars.o%j # name for standard output log file
 #SBATCH --error=era5_mars.e%j # name for standard error output log
 #SBATCH --partition=shared
-#SBATCH --account=bm1183
+#SBATCH --account=bu1562
 #SBATCH --nodes=1
 #SBATCH --time=08:00:00
 #SBATCH --mem=10GB

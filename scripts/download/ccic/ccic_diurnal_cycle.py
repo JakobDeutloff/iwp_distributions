@@ -25,11 +25,15 @@ del s3
 weights_vals = np.cos(np.deg2rad(ds.latitude))
 # make weights a DataArray with lat and lon dims from ds
 weights_vals = np.repeat(weights_vals.values[:, np.newaxis], ds.longitude.size, axis=1)
-weights = xr.DataArray(weights_vals, dims=["latitude", "longitude"], coords={"latitude": ds.latitude, "longitude": ds.longitude})
+weights = xr.DataArray(
+    weights_vals,
+    dims=["latitude", "longitude"],
+    coords={"latitude": ds.latitude, "longitude": ds.longitude},
+)
 
 # %% configure mask
 if region == "sea":
-    mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+    mask = xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc")
     mask = mask.sel(lat=slice(-30, 30)).load()
     mask = mask.sel(
         lon=ds["longitude"], lat=ds["latitude"], method="nearest"
@@ -39,10 +43,11 @@ elif region == "all":
 else:
     raise ValueError("region must be 'sea' or 'all'")
 # %%
-local_dir = f"/work/bm1183/m301049/ccic_daily_cycle/{year}/"
+local_dir = f"/work/bu1562/m301049/ccic_daily_cycle/{year}/"
 os.makedirs(local_dir, exist_ok=True)
 bins_lt = np.arange(0, 25, 1)
 bins_iwp = np.logspace(-3, 2, 254)
+
 
 def calc_2d_hist(file_path):
     s3 = s3fs.S3FileSystem(anon=True)
@@ -70,9 +75,11 @@ def calc_2d_hist(file_path):
         ds["tiwp"].isel(time=0).where(mask).values.flatten(),
         bins=[bins_lt, bins_iwp],
         density=False,
-        weights=weights.where(mask).values.flatten()
+        weights=weights.where(mask).values.flatten(),
     )
-    size_1 = weights.where(np.isfinite(ds["tiwp"].isel(time=0).where(mask))).sum().item()
+    size_1 = (
+        weights.where(np.isfinite(ds["tiwp"].isel(time=0).where(mask))).sum().item()
+    )
     time_1 = ds["time"].isel(time=0).values
 
     hist_2, _, _ = np.histogram2d(
@@ -80,9 +87,11 @@ def calc_2d_hist(file_path):
         ds["tiwp"].isel(time=1).where(mask).values.flatten(),
         bins=[bins_lt, bins_iwp],
         density=False,
-        weights=weights.where(mask).values.flatten()
+        weights=weights.where(mask).values.flatten(),
     )
-    size_2 = weights.where(np.isfinite(ds["tiwp"].isel(time=1).where(mask))).sum().item()
+    size_2 = (
+        weights.where(np.isfinite(ds["tiwp"].isel(time=1).where(mask))).sum().item()
+    )
     time_2 = ds["time"].isel(time=1).values
     return hist_1, hist_2, size_1, size_2, time_1, time_2
 

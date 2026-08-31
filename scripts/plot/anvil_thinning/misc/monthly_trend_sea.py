@@ -24,12 +24,12 @@ lon_min_twp = 120
 lon_max_twp = 180
 
 # %% load data
-hist_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists_sea.nc")
-hist_dardar = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar_sea.nc")
+hist_2c = xr.open_dataset("/work/bu1562/m301049/cloudsat/dists_sea.nc")
+hist_dardar = xr.open_dataset("/work/bu1562/m301049/dardarv3.10/hist_dardar_sea.nc")
 hists_monthly["2c"] = hist_2c
 hists_monthly["dardar"] = hist_dardar.resample(time="1ME").sum()
 mask = (
-    xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+    xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc")
     .load()
     .pipe(shift_longitudes, lon_name="lon")
 )
@@ -46,8 +46,6 @@ for dataset in datasets:
     #     (hists_monthly[dataset].time < pd.to_datetime("2011-01"))
     #     | (hists_monthly[dataset].time > pd.to_datetime("2012-04"))
     # )
-
-
 
 
 # %% normalise data
@@ -90,14 +88,12 @@ for dataset in datasets:
     rms = np.abs(hists_norm[dataset] - hists_norm[dataset].median("time")).sum(
         "bin_center"
     )
-    hists_norm[dataset] = hists_norm[dataset].where(
-        rms < rms.quantile(0.95)
-    )
+    hists_norm[dataset] = hists_norm[dataset].where(rms < rms.quantile(0.95))
 
-# %% filter size 
+# %% filter size
 for dataset in datasets:
     hists_norm[dataset] = hists_norm[dataset].where(
-        hists_monthly[dataset]['size'] > 1.2e6
+        hists_monthly[dataset]["size"] > 1.2e6
     )
 # %% detrend and deseasonalize monthly values
 hists_deseason = {}

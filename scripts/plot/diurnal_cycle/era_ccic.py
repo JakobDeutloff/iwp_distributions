@@ -20,13 +20,13 @@ dim = {"ccic": "iwp", "gpm": "bt", "icon": "iwp", "era5": "iwp"}
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
 )
 hists["era5"] = xr.open_dataset(
-    "/work/bm1183/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all.nc"
+    "/work/bu1562/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all.nc"
 )
 
 # %% calculate cloud fraction
@@ -39,9 +39,10 @@ for name in names:
     cf_norm[name] = cf[name] / cf[name].sum("local_time")
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %% regression long-term trend
+
 
 def regress_hist_temp_2d_trend(cf, temp):
     if "bt" in cf.dims:
@@ -152,8 +153,8 @@ for ax, (key, slope) in zip(axes.flatten(), slopes.items()):
     y_warped = (
         np.log10(slope.iwp.sel(iwp=slice(8e-2, 10)).values)
         * scalings[key].sel(iwp=slice(8e-2, 10)).values
-    )  
-    
+    )
+
     mask = p_values[key].sel(iwp=slice(8e-2, 10)).values > 0.05
     local_time_grid, dim_grid = np.meshgrid(
         p_values[key].local_time.values, y_warped, indexing="ij"

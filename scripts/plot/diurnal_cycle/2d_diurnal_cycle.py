@@ -16,47 +16,47 @@ dim = {"ccic": "iwp", "gpm": "bt", "icon": "iwp", "era5": "iwp"}
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
 )
 hists["era5"] = xr.open_dataset(
-    "/work/bm1183/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all_weighted.nc"
+    "/work/bu1562/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all_weighted.nc"
 )
 
 # %% load albedo
 albedo_iwp = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc"
 )
 albedo_bt = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc"
 )
 SW_in = xr.open_dataarray(
-    "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
+    "/work/bu1562/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
 )
 SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")
 # %% load bootstrapped feedbacks
 feedbacks_bs = {
     "ccic": xr.open_dataarray(
-        "/work/bm1183/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d.nc"
+        "/work/bu1562/m301049/diurnal_cycle_dists/ccic_bootstrap_feedback_2d.nc"
     ),
     "gpm": xr.open_dataarray(
-        "/work/bm1183/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc"
+        "/work/bu1562/m301049/diurnal_cycle_dists/gpm_bootstrap_feedback_2d.nc"
     ),
 }
 
 # %% open icon
 hist_icon_control = (
     xr.open_dataset(
-        "/work/bm1183/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
+        "/work/bu1562/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
     )
     .coarsen(iwp=4, boundary="trim")
     .sum()
 )
 hist_icon_4k = (
     xr.open_dataset(
-        "/work/bm1183/m301049/icon_hcap_data/plus2K/production/daily_cycle_hist_2d.nc"
+        "/work/bu1562/m301049/icon_hcap_data/plus2K/production/daily_cycle_hist_2d.nc"
     )
     .coarsen(iwp=4, boundary="trim")
     .sum()
@@ -73,7 +73,7 @@ for name in names:
     cf_norm[name] = cf[name] / cf[name].sum("local_time")
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %%  detrend and deseasonalize
 cf_detrend = {}
@@ -196,7 +196,7 @@ fig, axes = plot_2d_trend(
     ),
     dim="iwp",
 )
-#fig.savefig("plots/diurnal_cycle/long_term/int_var_2d_era5.pdf", bbox_inches="tight")
+# fig.savefig("plots/diurnal_cycle/long_term/int_var_2d_era5.pdf", bbox_inches="tight")
 
 # %% plot slopes gpm
 fig, axes = plot_2d_trend(
@@ -209,7 +209,7 @@ fig, axes = plot_2d_trend(
     err_feedback_bs["gpm"],
     dim="bt",
 )
-#fig.savefig("plots/diurnal_cycle/publication/gpm_2d_trend.pdf", bbox_inches="tight")
+# fig.savefig("plots/diurnal_cycle/publication/gpm_2d_trend.pdf", bbox_inches="tight")
 
 # %% plot slopes icon
 # 1 / K
@@ -294,16 +294,16 @@ for ax in axes:
 fig, ax = plt.subplots()
 
 ax.plot(
-    cf['ccic'].iwp,
-    cf['ccic'].sel(time='2016').mean(['time']).sum('local_time'),
-    color='k'
+    cf["ccic"].iwp,
+    cf["ccic"].sel(time="2016").mean(["time"]).sum("local_time"),
+    color="k",
 )
 ax.plot(
-    cf['era5'].iwp,
-    cf['era5'].sel(time='2016').mean(['time']).sum('local_time'),
-    color='r'
+    cf["era5"].iwp,
+    cf["era5"].sel(time="2016").mean(["time"]).sum("local_time"),
+    color="r",
 )
 
-ax.set_xscale('log')
+ax.set_xscale("log")
 ax.set_ylim([0, 0.02])
 # %%

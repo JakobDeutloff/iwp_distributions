@@ -6,13 +6,14 @@ from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 from src.helper_functions import shift_longitudes
 
+
 # %% def functions
 def read_cloudsat(year):
     """
     Function to read CloudSat for a given year
     """
 
-    path_cloudsat = "/work/bm1183/m301049/cloudsat/"
+    path_cloudsat = "/work/bu1562/m301049/cloudsat/"
     cloudsat = xr.open_dataset(
         path_cloudsat + year + "-07-01_" + str(int(year) + 1) + "-07-01_fwp.nc"
     )
@@ -48,36 +49,37 @@ cloudsat_xr = cloudsat_xr.assign(
         )
     }
 )
-cloudsat_xr = cloudsat_xr.pipe(shift_longitudes, lon_name='lon')
+cloudsat_xr = cloudsat_xr.pipe(shift_longitudes, lon_name="lon")
 bins = np.logspace(-3, 2, 254)
 
 # %%
 lon_min_twp = 120
 lon_max_twp = 180
-mask = xr.open_dataarray('/work/bm1183/m301049/orcestra/sea_land_mask.nc').pipe(shift_longitudes, lon_name='lon')
+mask = xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc").pipe(
+    shift_longitudes, lon_name="lon"
+)
+
 
 def calc_histogram(timestamp):
 
     ds = cloudsat_xr.sel(time=timestamp)
 
-    # drop duplicates 
-    ds = ds.drop_duplicates(dim='time')
+    # drop duplicates
+    ds = ds.drop_duplicates(dim="time")
 
     # check if any data available
     if not np.any(ds["iwp"].values):
-        return (np.ones(len(bins) - 1)*np.nan, np.nan)
-    
+        return (np.ones(len(bins) - 1) * np.nan, np.nan)
 
-    mask_daytime = (ds["local_time"] >= 6) & (
-        ds["local_time"] <= 18
-    )
-    #mask_sea = mask.sel(lon=ds["lon"], lat=ds["lat"], method='nearest')
+    mask_daytime = (ds["local_time"] >= 6) & (ds["local_time"] <= 18)
+    # mask_sea = mask.sel(lon=ds["lon"], lat=ds["lat"], method='nearest')
     data = ds["iwp"].where(mask_daytime)
     len_data = np.isfinite(data).sum()
     hist, _ = np.histogram(data, bins=bins, density=False)
     return (hist, len_data)
 
-# %% 
+
+# %%
 years = np.arange(2006, 2019)
 months = [f"{i:02d}" for i in range(1, 13)]
 time_stamps = [f"{year}-{month}" for year in years for month in months]
@@ -102,8 +104,8 @@ hists = xr.Dataset(
     },
 )
 
-# %% save hists 
-path = '/work/bu1562/m301049/cloudsat/dists_no_dup_fine.nc'
+# %% save hists
+path = "/work/bu1562/m301049/cloudsat/dists_no_dup_fine.nc"
 hists.to_netcdf(path)
 
 # %%

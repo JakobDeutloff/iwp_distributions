@@ -7,24 +7,25 @@ from tqdm import tqdm
 
 # %%
 year = sys.argv[1]
-path = f"/work/bm1183/m301049/dardarv3.10/{year}"
+path = f"/work/bu1562/m301049/dardarv3.10/{year}"
 
 # %% scan all subdirectories under path for .nc files bigger than 400 MB and apply select funtion to them
+
 
 def select_dardar(file):
     try:
         ds = xr.open_dataset(file)
         ds = ds[
-        [
-            "iwc",
-            "ln_iwc_error",
-            "latitude",
-            "longitude",
-            "land_water_mask",
-            "day_night_flag",
-            "sea_surface_temperature",
+            [
+                "iwc",
+                "ln_iwc_error",
+                "latitude",
+                "longitude",
+                "land_water_mask",
+                "day_night_flag",
+                "sea_surface_temperature",
+            ]
         ]
-    ]
         os.remove(file)
         ds.to_netcdf(file, mode="w")
     except Exception:

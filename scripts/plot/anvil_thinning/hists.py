@@ -1,7 +1,6 @@
 # %%
 import matplotlib.pyplot as plt
-import numpy as np
-from src.plot import plot_regression, definitions
+from src.plot import definitions
 from src.helper_functions import load_histograms, load_slopes, load_cre
 
 
@@ -86,3 +85,5 @@ fig.tight_layout()
 for i, ax in enumerate(axes[1:]):
     ax.text(0.02, 1, chr(97 + i), transform=ax.transAxes, fontsize=14, fontweight='bold')
 fig.savefig("plots/anvil_thinning/publication/distributions_cre_2016.pdf", bbox_inches="tight")
+
+# %%

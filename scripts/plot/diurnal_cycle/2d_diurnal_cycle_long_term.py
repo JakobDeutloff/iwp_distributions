@@ -9,43 +9,46 @@ from src.plot import definitions, plot_2d_trend, plot_2d_trend_talk
 from scipy.signal import detrend
 import matplotlib.pyplot as plt
 
-
 # %% load ccic and gpm data
 colors, line_labels, linestyles = definitions()
 color = {"ccic": "black", "gpm": "orange", "icon": "green", "era5": "blue"}
-names = ["ccic", "gpm", 'era5']
+names = ["ccic", "gpm", "era5"]
 dim = {"ccic": "iwp", "gpm": "bt", "icon": "iwp", "era5": "iwp"}
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
 )
 hists["era5"] = xr.open_dataset(
-    "/work/bm1183/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all.nc"
+    "/work/bu1562/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_all.nc"
 )
 
 # %% load albedo
-albedo_iwp = xr.open_dataset("/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc")
-albedo_bt = xr.open_dataset("/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc")
+albedo_iwp = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc"
+)
+albedo_bt = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc"
+)
 SW_in = xr.open_dataarray(
-    "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
+    "/work/bu1562/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
 )
 SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")
 
 # %% calculate cloud fraction
 cf = {}
 for name in names:
-    cf[name] = hists[name]['hist'] / hists[name]['size']
+    cf[name] = hists[name]["hist"] / hists[name]["size"]
 # %% normalise cloud fraction
 cf_norm = {}
 for name in names:
-    cf_norm[name] = cf[name] / cf[name].sum('local_time')
+    cf_norm[name] = cf[name] / cf[name].sum("local_time")
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %% calc annual means
 temp_ann = temp.groupby("time.year").mean("time").rename(year="time")
@@ -53,11 +56,12 @@ cf_ann = {}
 cf_norm_ann = {}
 for name in names:
     cf_ann[name] = cf[name].groupby("time.year").mean("time").rename(year="time")
-    cf_norm_ann[name] = cf_ann[name] / cf_ann[name].sum('local_time')
+    cf_norm_ann[name] = cf_ann[name] / cf_ann[name].sum("local_time")
 
 # %% regression
 import numpy as np
 from scipy.stats import linregress
+
 
 def regress_hist_temp_2d_trend(cf, temp):
     if "bt" in cf.dims:
@@ -77,11 +81,12 @@ def regress_hist_temp_2d_trend(cf, temp):
             slope_freq, _, _, p_value, _ = linregress(
                 np.arange(len(cf_vals.values)), cf_vals.values
             )
-            slopes.loc[{"local_time": i, detrend_dim: j}] = slope_freq/slope_temp
+            slopes.loc[{"local_time": i, detrend_dim: j}] = slope_freq / slope_temp
             p_values.loc[{"local_time": i, detrend_dim: j}] = p_value
-    
+
     slopes_perc = slopes * 100 / cf.mean("time")  # convert to % / K
     return slopes_perc, p_values
+
 
 slopes = {}
 p_values = {}
@@ -108,7 +113,7 @@ albedo = {
 }
 
 for name in names:
-    cf_change[name] = (slopes[name] / 100) *  cf[name].mean('time')  # 1/K
+    cf_change[name] = (slopes[name] / 100) * cf[name].mean("time")  # 1/K
     feedbacks[name] = -1 * (
         (cf_change[name] * SW_in * albedo[name].values.T)
         - ((cf_change[name]) * SW_in * 0.1)
@@ -116,16 +121,13 @@ for name in names:
     feedbacks_int[name] = feedbacks[name].sel(cutoffs[name]).sum()  # W / m^2 / K
 
 
-# %% calculate cumulative feedback 
+# %% calculate cumulative feedback
 feedback_cum = {}
 feedback_cum_ann = {}
 feedback_cum_reg = {}
 feedback_cum_reg_ann = {}
 feedback_cum["ccic"] = (
-    feedbacks["ccic"]
-    .sel(cutoffs["ccic"])
-    .sum("local_time")
-    .cumsum("iwp")
+    feedbacks["ccic"].sel(cutoffs["ccic"]).sum("local_time").cumsum("iwp")
 )
 feedback_cum["gpm"] = (
     feedbacks["gpm"]
@@ -135,15 +137,12 @@ feedback_cum["gpm"] = (
     .cumsum("bt")
 )
 feedback_cum["era5"] = (
-    feedbacks["era5"]
-    .sel(cutoffs["era5"])
-    .sum("local_time")
-    .cumsum("iwp")
+    feedbacks["era5"].sel(cutoffs["era5"]).sum("local_time").cumsum("iwp")
 )
 
 # %% plot slopes ccic trend
 fig, axes = plot_2d_trend(
-    cf["ccic"].mean('time'),
+    cf["ccic"].mean("time"),
     slopes["ccic"],
     cf_change["ccic"],
     feedbacks["ccic"],
@@ -156,7 +155,7 @@ fig.savefig("plots/diurnal_cycle/long_term/trend_2d_ccic.pdf", bbox_inches="tigh
 
 # %% plot slopes gpm trend
 fig, axes = plot_2d_trend(
-    cf["gpm"].mean('time'),
+    cf["gpm"].mean("time"),
     slopes["gpm"],
     cf_change["gpm"],
     feedbacks["gpm"],
@@ -168,7 +167,7 @@ fig, axes = plot_2d_trend(
 fig.savefig("plots/diurnal_cycle/long_term/trend_2d_gpm.pdf", bbox_inches="tight")
 # %% plot slopes era5 trend
 fig, axes = plot_2d_trend(
-    cf["era5"].mean('time'),
+    cf["era5"].mean("time"),
     slopes["era5"],
     cf_change["era5"],
     feedbacks["era5"],

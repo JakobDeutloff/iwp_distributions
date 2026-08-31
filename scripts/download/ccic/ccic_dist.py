@@ -16,7 +16,7 @@ s3 = s3fs.S3FileSystem(anon=True)
 prefix = f"chalmerscloudiceclimatology/record/cpcir/{year}/ccic_cpcir_{year}{month}*"
 files = s3.glob(prefix)
 # %%
-local_dir = f"/work/bm1183/m301049/ccic/{year}/"
+local_dir = f"/work/bu1562/m301049/ccic/{year}/"
 os.makedirs(local_dir, exist_ok=True)
 bins = np.logspace(-3, 2, 254)
 

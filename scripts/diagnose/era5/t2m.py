@@ -1,18 +1,18 @@
 # %%
-import xarray as xr 
+import xarray as xr
 import numpy as np
 from src.helper_functions import shift_longitudes
 
-# %% 
-temp_all = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m.nc")
+# %%
+temp_all = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m.nc")
 
 # %%
 mask = (
-    xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc")
+    xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc")
     .load()
     .pipe(shift_longitudes, lon_name="lon")
 )
-mask = mask.sel(lon=temp_all.longitude, lat=temp_all.latitude, method='nearest')
+mask = mask.sel(lon=temp_all.longitude, lat=temp_all.latitude, method="nearest")
 
 # %% calculate mean tropical temp
 temp_trop = (
@@ -23,10 +23,10 @@ temp_trop = (
 ).mean(
     "latitude"
 )
-temp_trop = temp_trop.rename({'valid_time': 'time'})
-temp_trop.to_netcdf("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc")
+temp_trop = temp_trop.rename({"valid_time": "time"})
+temp_trop.to_netcdf("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc")
 
-# %% calculate mean sea tropical temp 
+# %% calculate mean sea tropical temp
 temp_sea = (
     temp_all.where(mask).sel(latitude=slice(30, -30))
     * np.cos(np.deg2rad(temp_all.sel(latitude=slice(30, -30)).latitude))
@@ -35,20 +35,20 @@ temp_sea = (
 ).mean(
     "latitude"
 )
-temp_sea = temp_sea.rename({'valid_time': 'time'})
-temp_sea.to_netcdf("/work/bm1183/m301049/era5/monthly/t2m_tropics_sea.nc")
+temp_sea = temp_sea.rename({"valid_time": "time"})
+temp_sea.to_netcdf("/work/bu1562/m301049/era5/monthly/t2m_tropics_sea.nc")
 
 
 # %% calculate mean land tropical temp
 temp_land = (
-    temp_all.where(mask==0).sel(latitude=slice(30, -30))
+    temp_all.where(mask == 0).sel(latitude=slice(30, -30))
     * np.cos(np.deg2rad(temp_all.sel(latitude=slice(30, -30)).latitude))
 ).mean(["latitude", "longitude"]) / np.cos(
     np.deg2rad(temp_all.sel(latitude=slice(30, -30)).latitude)
 ).mean(
     "latitude"
 )
-temp_land = temp_land.rename({'valid_time': 'time'})
-temp_land.to_netcdf("/work/bm1183/m301049/era5/monthly/t2m_tropics_land.nc")
+temp_land = temp_land.rename({"valid_time": "time"})
+temp_land.to_netcdf("/work/bu1562/m301049/era5/monthly/t2m_tropics_land.nc")
 
 # %%

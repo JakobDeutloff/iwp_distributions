@@ -138,14 +138,14 @@ slopes = slopes.assign(
     }
 )
 slopes = slopes.assign(
-    {"xshield": (hists_model["xshield_plus4K"] - hists_model["xshield_control"]) / 4}
+    {"xshield": (hists_model["xshield_plus4K"] - hists_model["xshield_control"]) / 4.25}
 )
 slopes = slopes.assign(
     {
         "icon_amip": (
             hists_model["icon_amip_plus4K"] - hists_model["icon_amip_control"]
         )
-        / 4
+        / 4.25
     }
 )
 

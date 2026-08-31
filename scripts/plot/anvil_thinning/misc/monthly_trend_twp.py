@@ -1,4 +1,4 @@
-# %% 
+# %%
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,20 +24,25 @@ lon_min_twp = 120
 lon_max_twp = 180
 
 # %% load data
-hist_2c = xr.open_dataset('/work/bm1183/m301049/cloudsat/dists_twp.nc')
-hist_dardar = xr.open_dataset('/work/bm1183/m301049/dardarv3.10/hist_dardar_twp.nc')
-hists_monthly['2c'] = hist_2c
-hists_monthly['dardar'] = hist_dardar.resample(time='1ME').sum()
+hist_2c = xr.open_dataset("/work/bu1562/m301049/cloudsat/dists_twp.nc")
+hist_dardar = xr.open_dataset("/work/bu1562/m301049/dardarv3.10/hist_dardar_twp.nc")
+hists_monthly["2c"] = hist_2c
+hists_monthly["dardar"] = hist_dardar.resample(time="1ME").sum()
 
-# %% filter data 
+# %% filter data
 for dataset in datasets:
-    hists_monthly[dataset]["time"] = pd.to_datetime(hists_monthly[dataset]["time"].dt.strftime("%Y-%m")
+    hists_monthly[dataset]["time"] = pd.to_datetime(
+        hists_monthly[dataset]["time"].dt.strftime("%Y-%m")
     )
-    hists_monthly[dataset] = hists_monthly[dataset].sel(time=slice('2006-07', '2017-12'))
+    hists_monthly[dataset] = hists_monthly[dataset].sel(
+        time=slice("2006-07", "2017-12")
+    )
 
-# %% normalise data 
+# %% normalise data
 for dataset in datasets:
-    hists_monthly[dataset] = hists_monthly[dataset]['hist'] / hists_monthly[dataset]['size']
+    hists_monthly[dataset] = (
+        hists_monthly[dataset]["hist"] / hists_monthly[dataset]["size"]
+    )
 
 # %% load era5 surface temp
 path_t2m = "/pool/data/ERA5/E5/sf/an/1M/167/"
@@ -48,30 +53,37 @@ files = glob.glob(path_t2m + "E5sf00_1M_*.grb")
 files_after_2000 = [
     f for f in files if int(re.search(r"_(\d{4})_", f).group(1)) >= 2000
 ]
-ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords").chunk({'time': 1, 'values':-1})
+ds = xr.open_mfdataset(files_after_2000, engine="cfgrib", combine="by_coords").chunk(
+    {"time": 1, "values": -1}
+)
 
 # slect tropics and calculate annual average
 with ProgressBar():
     t_month = (
         ds["t2m"]
-        .where((ds["latitude"] >= -30) & (ds["latitude"] <= 30) & (ds["longitude"] >= lon_min_twp) & (ds["longitude"] <= lon_max_twp))
+        .where(
+            (ds["latitude"] >= -30)
+            & (ds["latitude"] <= 30)
+            & (ds["longitude"] >= lon_min_twp)
+            & (ds["longitude"] <= lon_max_twp)
+        )
         .mean("values")
         .compute()
     )
     t_trop = (
-        ds['t2m']
+        ds["t2m"]
         .where((ds["latitude"] >= -30) & (ds["latitude"] <= 30))
         .mean("values")
         .compute()
     )
 
 
-t_trop['time'] = pd.to_datetime(t_trop['time'].dt.strftime('%Y-%m'))
+t_trop["time"] = pd.to_datetime(t_trop["time"].dt.strftime("%Y-%m"))
 t_month["time"] = pd.to_datetime(t_month["time"].dt.strftime("%Y-%m"))
 
 
-# %%  
-plot_hists(hists_monthly['dardar'], t_month, bins)
+# %%
+plot_hists(hists_monthly["dardar"], t_month, bins)
 
 # %% detrend and deseasonalize monthly values
 hists_deseason = {}
@@ -82,9 +94,9 @@ t_deseason = t_detrend.groupby("time.month") - t_detrend.groupby("time.month").m
     "time"
 )
 t_trop_detrend = xr.DataArray(detrend(t_trop), coords=t_trop.coords, dims=t_trop.dims)
-t_trop_deseason = t_trop_detrend.groupby("time.month") - t_trop_detrend.groupby("time.month").mean(
-    "time"
-)
+t_trop_deseason = t_trop_detrend.groupby("time.month") - t_trop_detrend.groupby(
+    "time.month"
+).mean("time")
 
 for ds in datasets:
     hists_detrend = nan_detrend(hists_monthly[ds])
@@ -127,7 +139,7 @@ fig, axes = plot_regression(
     "2C-ICE Monthly",
 )
 fig.savefig("plots/2c_monthly_twp.png", dpi=300, bbox_inches="tight")
-# %% 
+# %%
 fig, axes = plot_regression(
     t_deseason.sel(time=hists_deseason["dardar"].time),
     hists_deseason["dardar"].T,
@@ -139,20 +151,20 @@ fig.savefig("plots/dardar_monthly_twp.png", dpi=300, bbox_inches="tight")
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-t_deseason.plot(ax=axes[0], color='blue', label='TWP')
-t_trop_deseason.plot(ax=axes[0], color='orange', label='Tropics')
-axes[0].set_ylabel('T2m / K')
+t_deseason.plot(ax=axes[0], color="blue", label="TWP")
+t_trop_deseason.plot(ax=axes[0], color="orange", label="Tropics")
+axes[0].set_ylabel("T2m / K")
 axes[0].legend()
 
 axes[1].scatter(t_deseason, t_trop_deseason)
 res = linregress(t_deseason, t_trop_deseason)
-axes[1].text(0.02, 0.9, f'r={res.rvalue:.2f}', transform=axes[1].transAxes)
-axes[1].set_xlabel('TWP T2m / K')
-axes[1].set_ylabel('Tropics T2m / K')
+axes[1].text(0.02, 0.9, f"r={res.rvalue:.2f}", transform=axes[1].transAxes)
+axes[1].set_xlabel("TWP T2m / K")
+axes[1].set_ylabel("Tropics T2m / K")
 
 for ax in axes:
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
 fig.savefig("plots/twp_tropics_t2m.png", dpi=300, bbox_inches="tight")
 
@@ -162,16 +174,16 @@ max_lag = 12
 lags = np.arange(-max_lag, max_lag + 1)
 correlations = {}
 for lag in lags:
-    temp_lagged = t_deseason.shift(time=lag).dropna('time')
+    temp_lagged = t_deseason.shift(time=lag).dropna("time")
     res = linregress(temp_lagged, t_trop_deseason.sel(time=temp_lagged.time))
     correlations[lag] = res.rvalue
 
 # %% plot
-fig, ax = plt.subplots(figsize=(6,4))
+fig, ax = plt.subplots(figsize=(6, 4))
 ax.plot(list(correlations.keys()), list(correlations.values()))
-ax.set_xlabel('Lag of TWP to Tropics T2m / months')
-ax.set_ylabel('Correlation coefficient')
-ax.spines[['top', 'right']].set_visible(False)
+ax.set_xlabel("Lag of TWP to Tropics T2m / months")
+ax.set_ylabel("Correlation coefficient")
+ax.spines[["top", "right"]].set_visible(False)
 fig.savefig("plots/lagged_correlation_twp_tropics.png", dpi=300, bbox_inches="tight")
 
 # %%

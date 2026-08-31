@@ -12,7 +12,6 @@ from src.plot import plot_regression, definitions
 from src.helper_functions import nan_detrend
 import pickle
 
-
 # %% initialize containers
 hists_monthly = {}
 hists_smooth = {}
@@ -23,7 +22,7 @@ datasets = ["ccic", "2c", "dardar", "spare"]
 colors, line_labels, linestyles = definitions()
 
 # %% open CCIC
-path = "/work/bm1183/m301049/ccic/"
+path = "/work/bu1562/m301049/ccic/"
 years = range(2000, 2024)
 months = [f"{i:02d}" for i in range(1, 13)]
 hist_list = []
@@ -40,13 +39,13 @@ for year in years:
 hists_ccic = xr.concat(hist_list, dim="time")
 
 # %% open 2C-ICE
-hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
+hists_2c = xr.open_dataset("/work/bu1562/m301049/cloudsat/dists.nc")
 
 # %% open dardar
-hists_dardar = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
+hists_dardar = xr.open_dataset("/work/bu1562/m301049/dardarv3.10/hist_dardar.nc")
 
 # %% open spareice
-hists_spare = xr.open_dataset("/work/bm1183/m301049/spareice/hists_metop.nc")
+hists_spare = xr.open_dataset("/work/bu1562/m301049/spareice/hists_metop.nc")
 
 # %% coarsen histograms and normalise by size
 hists_ccic_coarse = hists_ccic.coarsen(bin_center=4, boundary="trim").sum()
@@ -131,9 +130,9 @@ for ds in datasets:
         dims=["bin_center"],
     )
 # %% save slopes
-with open("/work/bm1183/m301049/iwp_dists/slopes_annual.pkl", "wb") as f:
+with open("/work/bu1562/m301049/iwp_dists/slopes_annual.pkl", "wb") as f:
     pickle.dump(slopes, f)
-with open("/work/bm1183/m301049/iwp_dists/error_annual.pkl", "wb") as f:
+with open("/work/bu1562/m301049/iwp_dists/error_annual.pkl", "wb") as f:
     pickle.dump(error, f)
 
 # %% plot annual variability and regression slopes
@@ -189,9 +188,9 @@ for ds in datasets:
 ax.set_xscale("log")
 ax.set_xlim([1e-3, 40])
 ax.axhline(0, color="k", linestyle="--", linewidth=1)
-# %% load cre 
+# %% load cre
 cre = xr.open_dataset(
-    f"/work/bm1183/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
+    f"/work/bu1562/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
 )
 
 # interpolate
@@ -199,7 +198,7 @@ cre["iwp"] = np.log10(cre["iwp"])
 cre = cre.interp(
     iwp=np.log10(hists_annual["ccic"].bin_center), method="linear"
 ).drop_vars("iwp")
-cre['bin_center'] = 10 ** cre['bin_center']
+cre["bin_center"] = 10 ** cre["bin_center"]
 # %% calculate feedback
 feedback = {}
 for ds in datasets:

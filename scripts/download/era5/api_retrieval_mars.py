@@ -12,10 +12,10 @@ base_request = {
     "levtype": "ml",
     "stream": "moda",
     "grid": "0.25/0.25",
-    "area": "30/-180/-30/180",            
-    #'format': 'netcdf',  
+    "area": "30/-180/-30/180",
+    #'format': 'netcdf',
 }
-path = "/work/bm1183/m301049/era5/monthly"
+path = "/work/bu1562/m301049/era5/monthly"
 param = sys.argv[1]
 type = sys.argv[2]
 save_path = f"{path}/{param}_{type}_latlon.grb"
@@ -24,7 +24,6 @@ save_path = f"{path}/{param}_{type}_latlon.grb"
 req_sp = base_request.copy()
 req_sp.update({"param": param, "type": type})
 c.retrieve("reanalysis-era5-complete", req_sp, save_path)
-
 
 
 # %%

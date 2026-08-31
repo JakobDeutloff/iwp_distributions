@@ -285,10 +285,9 @@ def load_histograms(set="all", freq="1ME"):
     # observations
     hists_obs = {}
     hist_2d = xr.open_dataset(
-        "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
+        "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted_noz.nc"
     )
     hists_obs["ccic"] = hist_2d.sum("local_time")
-    hists_obs["ccic"]["hist"][:, 0] = hists_obs["ccic"]["hist"][:, 1]
     hists_obs["two_c_ice"] = xr.open_dataset(
         "/work/bu1562/m301049/cloudsat/dists_no_dup_fine.nc"
     )
@@ -334,30 +333,34 @@ def load_histograms(set="all", freq="1ME"):
     # icon AMIP
     icon_amip_cont = (
         xr.open_dataset(
-            "/work/bu1562/m301049/icon-amip/histogram_iwp_ctrl_20200401_20200831.nc"
+            "/work/bu1562/m301049/icon-amip/histogram_iwp_ctrl_20200401_20200831-2.nc"
         )
         .sel(domain="land_ocean")
-        .rename({"iwp_bin": "iwp"})["pdf"]
+        .rename({"iwp_bin": "iwp"})
         .drop_vars("domain")
+    )
+    icon_amip_cont = icon_amip_cont["pdf"] / (
+        icon_amip_cont["pdf"].sum("iwp") + icon_amip_cont["clear_sky_area"]
     )
     icon_amip_4k = (
         xr.open_dataset(
-            "/work/bu1562/m301049/icon-amip/histogram_iwp_sst4k_20200401_20200831.nc"
+            "/work/bu1562/m301049/icon-amip/histogram_iwp_sst4k_20200401_20200831-2.nc"
         )
         .sel(domain="land_ocean")
-        .rename({"iwp_bin": "iwp"})["pdf"]
+        .rename({"iwp_bin": "iwp"})
         .drop_vars("domain")
     )
-    hists_model["icon_amip_control"] = (
-        icon_amip_cont.coarsen(iwp=4, boundary="trim").sum() / icon_amip_cont.sum() / 3
+    icon_amip_4k = icon_amip_4k["pdf"] / (
+        icon_amip_4k["pdf"].sum("iwp") + icon_amip_4k["clear_sky_area"]
     )
-    hists_model["icon_amip_plus4K"] = (
-        icon_amip_4k.coarsen(iwp=4, boundary="trim").sum() / icon_amip_4k.sum() / 3
-    )
+    hists_model["icon_amip_control"] = icon_amip_cont.coarsen(
+        iwp=4, boundary="trim"
+    ).sum()
+    hists_model["icon_amip_plus4K"] = icon_amip_4k.coarsen(iwp=4, boundary="trim").sum()
 
     # rcemip
     ds = xr.open_dataset(
-        "/work/bm1183/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
+        "/work/bu1562/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
     )
     ds["fwp"] = ds["fwp"] * 1e-3
     rcemip_pdf = interpolate_bins(
@@ -368,10 +371,10 @@ def load_histograms(set="all", freq="1ME"):
 
     # xshield
     xshield_cont = xr.open_dataset(
-        "/work/bm1183/m301049/xshield/xshield24v2_iw_histogram.nc"
+        "/work/bu1562/m301049/xshield/xshield24v2_iw_histogram.nc"
     )
     xshield_4k = xr.open_dataset(
-        "/work/bm1183/m301049/xshield/xshield24v2_PLUS_4K_iw_histogram.nc"
+        "/work/bu1562/m301049/xshield/xshield24v2_PLUS_4K_iw_histogram.nc"
     )
     hists_model["xshield_control"] = xshield_cont["f"]
     hists_model["xshield_plus4K"] = xshield_4k["f"]
@@ -417,7 +420,7 @@ def load_slopes():
 
 def load_cre():
     cre = xr.open_dataset(
-        f"/work/bm1183/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
+        f"/work/bu1562/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
     )
     hists = load_histograms("obs")
     cre["iwp"] = np.log10(cre["iwp"])

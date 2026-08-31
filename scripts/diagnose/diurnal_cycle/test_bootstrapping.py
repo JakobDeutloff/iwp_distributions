@@ -21,7 +21,6 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import matplotlib.pyplot as plt
 
-
 # %% load ccic and gpm data
 colors, line_labels, linestyles = definitions()
 color = {"ccic": "black", "gpm": "orange", "icon": "green"}
@@ -29,22 +28,25 @@ names = ["ccic", "gpm"]
 
 hists = {}
 hists["ccic"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all_weighted.nc"
 )
 hists["gpm"] = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_all_weighted.nc"
 )
 cutoffs = {
     "ccic": {"iwp": slice(1e-1, None)},
     "gpm": {"bt": slice(190, 260)},
-
 }
 SW_in = xr.open_dataarray(
-    "/work/bm1183/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
+    "/work/bu1562/m301049/icon_hcap_data/publication/incoming_sw/SW_in_daily_cycle.nc"
 )
 SW_in = SW_in.interp(time_points=hists["ccic"]["local_time"], method="linear")
-albedo_iwp = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc')['hc_albedo']
-albedo_bt = xr.open_dataset('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc')['hc_albedo']
+albedo_iwp = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc"
+)["hc_albedo"]
+albedo_bt = xr.open_dataset(
+    "/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc"
+)["hc_albedo"]
 albedo = {
     "ccic": albedo_iwp,
     "gpm": albedo_bt,
@@ -55,7 +57,7 @@ for name in names:
     albedo[name] = albedo[name].sel(cutoffs[name])
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %%
 hists_monthly = {}
@@ -70,6 +72,7 @@ for name in names:
     hists_detrend[name] = detrend_hist_2d(hists_monthly[name])
     hists_detrend[name] = deseason(hists_detrend[name])
 
+
 # %%
 def get_albedo(name):
     offset = np.random.uniform(-0.2, 0.2)
@@ -77,21 +80,18 @@ def get_albedo(name):
     albedo_rand = albedo_rand.clip(0, 1)
     return albedo_rand
 
-def calc_feedback_bs(name='ccic', len_block=36):
+
+def calc_feedback_bs(name="ccic", len_block=36):
 
     n_sample = hists_detrend[name].time.size
     n_blocks = int(hists_monthly[name].time.size / len_block)
-    max_idx_block = n_sample-len_block
+    max_idx_block = n_sample - len_block
     np.random.seed()
     block_idxs = np.random.randint(0, max_idx_block, n_blocks)
     time_idx = []
 
     for i in block_idxs:
-        time_idx.extend(
-            list(
-                range(i, i+len_block)
-            )  # create list of time indices
-        )
+        time_idx.extend(list(range(i, i + len_block)))  # create list of time indices
     slope_bs, _ = regress_hist_temp_2d(
         hists_detrend[name].isel(time=time_idx),
         temp_detrend,
@@ -108,6 +108,7 @@ def calc_feedback_bs(name='ccic', len_block=36):
     )  # W / m^2 / K
     return feedback_2d_bs
 
+
 # %% test bootstrapping for different number of samples
 n_iterations = [16, 32, 64, 125, 250, 500, 1000, 2000]
 n_repeats = 5
@@ -117,14 +118,16 @@ for n in n_iterations:
     feedbacks = [None] * n_repeats
     for j in range(n_repeats):
         with ProcessPoolExecutor(max_workers=128) as executor:
-            results = list(
-                tqdm(executor.map(calc_feedback_bs, ['ccic'] * n), total=n)
-            )
+            results = list(tqdm(executor.map(calc_feedback_bs, ["ccic"] * n), total=n))
         #  put the results into an xarray
         feedbacks[j] = xr.concat(results, dim="iteration")
     feedbacks_bs[n] = xr.concat(feedbacks, dim="repeat_iteration")
 
- # %%  save results
+# %%  save results
 import pickle
-with open("/work/bm1183/m301049/diurnal_cycle_publication/ccic_bootstrap_feedback_2d_sample_size_test.pkl", "wb") as f:
+
+with open(
+    "/work/bu1562/m301049/diurnal_cycle_publication/ccic_bootstrap_feedback_2d_sample_size_test.pkl",
+    "wb",
+) as f:
     pickle.dump(feedbacks_bs, f)

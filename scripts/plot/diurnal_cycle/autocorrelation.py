@@ -7,7 +7,7 @@ from scipy.stats import pearsonr
 import numpy as np
 
 # %% load era5 surface temp
-temp = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temp = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 
 # %%  detrend and deseasonalize
 temp_detrend = xr.DataArray(detrend(temp), coords=temp.coords, dims=temp.dims)
@@ -44,6 +44,8 @@ for ax, letter in zip(axes, ["a", "b"]):
         fontsize=22,
         fontweight="bold",
     )
-fig.savefig('plots/diurnal_cycle/publication/t2m_autocorrelation.pdf', bbox_inches='tight')
+fig.savefig(
+    "plots/diurnal_cycle/publication/t2m_autocorrelation.pdf", bbox_inches="tight"
+)
 
 # %%

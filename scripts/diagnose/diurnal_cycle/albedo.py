@@ -7,33 +7,38 @@ import os
 import pickle
 
 # %% load icon data
-run = 'jed0011'
+run = "jed0011"
 exp_name = {"jed0011": "control", "jed0022": "plus4K", "jed0033": "plus2K"}
-colors = {'jed0011': 'k', 'jed0022': 'r', 'jed0033': 'orange'}
+colors = {"jed0011": "k", "jed0022": "r", "jed0033": "orange"}
 ds = xr.open_dataset(
-    f"/work/bm1183/m301049/icon_hcap_data/{exp_name[run]}/production/random_sample/{run}_randsample_processed_64.nc"
+    f"/work/bu1562/m301049/icon_hcap_data/{exp_name[run]}/production/random_sample/{run}_randsample_processed_64.nc"
 ).sel(index=slice(None, 1e6))
 
-# %% load hists for bins 
+# %% load hists for bins
 hist_ccic = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_all.nc"
 )
 hist_gpm = xr.open_dataset(
-    "/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
+    "/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_all.nc"
 )
 
 # %% load bt_of_iwp
 bt_of_iwp = xr.open_dataset(
-    '/work/bm1183/m301049/diurnal_cycle_dists/bt_of_iwp.nc'
-).mean('time')
+    "/work/bu1562/m301049/diurnal_cycle_dists/bt_of_iwp.nc"
+).mean("time")
 iwp_of_bt = xr.DataArray(
-    np.log10(bt_of_iwp['iwp'].values),
-    coords={'bt': bt_of_iwp['bt_of_iwp'].values},
-    dims=['bt'])
-iwp_of_bt = iwp_of_bt.drop_duplicates('bt')
+    np.log10(bt_of_iwp["iwp"].values),
+    coords={"bt": bt_of_iwp["bt_of_iwp"].values},
+    dims=["bt"],
+)
+iwp_of_bt = iwp_of_bt.drop_duplicates("bt")
+
+
 # %% functions
 def calc_hc_albedo(a_cs, a_as):
     return (a_as - a_cs) / (a_cs * (a_as - 2) + 1)
+
+
 def iwp_from_bt_corr(bt):
     return 10 ** iwp_of_bt.interp(bt=bt).values
 
@@ -52,15 +57,13 @@ binned_hc_albedo_iwp = np.zeros([len(iwp_bins) - 1, len(time_bins) - 1]) * np.na
 binned_hc_albedo_bt = np.zeros([len(bt_bins) - 1, len(time_bins) - 1]) * np.nan
 
 # %% set mask
-mask_parameterisation = (ds['mask_low_cloud'] == 0)
+mask_parameterisation = ds["mask_low_cloud"] == 0
 
 # %% calculate high cloud albedo
 sw_vars["wetsky_albedo"] = np.abs(ds["rsutws"] / ds["rsdt"])
 sw_vars["allsky_albedo"] = np.abs(ds["rsut"] / ds["rsdt"])
 sw_vars["clearsky_albedo"] = np.abs(ds["rsutcs"] / ds["rsdt"])
-cs_albedo = xr.where(
-    ds["conn"], sw_vars["clearsky_albedo"], sw_vars["wetsky_albedo"]
-)
+cs_albedo = xr.where(ds["conn"], sw_vars["clearsky_albedo"], sw_vars["wetsky_albedo"])
 sw_vars["high_cloud_albedo"] = calc_hc_albedo(cs_albedo, sw_vars["allsky_albedo"])
 
 # %% calculate mean albedos by weighting with the incoming SW radiation in IWP bins
@@ -68,8 +71,8 @@ sw_vars["high_cloud_albedo"] = calc_hc_albedo(cs_albedo, sw_vars["allsky_albedo"
 for i in range(len(iwp_bins) - 1):
     IWP_mask = (ds["iwp"] > iwp_bins[i]) & (ds["iwp"] <= iwp_bins[i + 1])
     for j in range(len(time_bins) - 1):
-        time_mask = (ds['time_local'] > time_bins[j]) & (
-            ds['time_local'] <= time_bins[j + 1]
+        time_mask = (ds["time_local"] > time_bins[j]) & (
+            ds["time_local"] <= time_bins[j + 1]
         )
         binned_hc_albedo_iwp[i, j] = float(
             sw_vars["high_cloud_albedo"]
@@ -77,12 +80,12 @@ for i in range(len(iwp_bins) - 1):
             .mean()
             .values
         )
-# %%calculate albedo for bt bins 
+# %%calculate albedo for bt bins
 for i in range(len(iwp_bins_bt) - 1):
     IWP_mask = (ds["iwp"] <= iwp_bins_bt[i]) & (ds["iwp"] > iwp_bins_bt[i + 1])
     for j in range(len(time_bins) - 1):
-        time_mask = (ds['time_local'] > time_bins[j]) & (
-            ds['time_local'] <= time_bins[j + 1]
+        time_mask = (ds["time_local"] > time_bins[j]) & (
+            ds["time_local"] <= time_bins[j + 1]
         )
         binned_hc_albedo_bt[i, j] = float(
             sw_vars["high_cloud_albedo"]
@@ -97,12 +100,14 @@ albedo_iwp = xr.Dataset(
         "hc_albedo": (("iwp", "local_time"), binned_hc_albedo_iwp),
     },
     coords={
-        "iwp": hist_ccic['iwp'],
-        "local_time": time_points,#
+        "iwp": hist_ccic["iwp"],
+        "local_time": time_points,  #
     },
 )
-albedo_iwp.to_netcdf('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc')
-albedo_iwp.to_netcdf('/work/bm1183/m301049/diurnal_cycle_publication/binned_hc_albedo_iwp.nc')
+albedo_iwp.to_netcdf("/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_iwp.nc")
+albedo_iwp.to_netcdf(
+    "/work/bu1562/m301049/diurnal_cycle_publication/binned_hc_albedo_iwp.nc"
+)
 
 # %%
 albedo_bt = xr.Dataset(
@@ -110,26 +115,26 @@ albedo_bt = xr.Dataset(
         "hc_albedo": (("bt", "local_time"), binned_hc_albedo_bt),
     },
     coords={
-        "bt": hist_gpm['bt'],
+        "bt": hist_gpm["bt"],
         "local_time": time_points,
     },
 )
-albedo_bt.to_netcdf('/work/bm1183/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc')
+albedo_bt.to_netcdf("/work/bu1562/m301049/diurnal_cycle_dists/binned_hc_albedo_bt.nc")
 
-# %% plot albedo 
+# %% plot albedo
 fig, ax = plt.subplots(figsize=(8, 6))
 im = ax.pcolor(
-    albedo_iwp['local_time'], 
-    albedo_iwp.sel(iwp=slice(0.01, 10))['iwp'], 
-    albedo_iwp['hc_albedo'].sel(iwp=slice(0.01, 10)),
-    cmap='viridis',
-    shading='auto',
-    vmin=0.1, 
-    vmax=0.8
+    albedo_iwp["local_time"],
+    albedo_iwp.sel(iwp=slice(0.01, 10))["iwp"],
+    albedo_iwp["hc_albedo"].sel(iwp=slice(0.01, 10)),
+    cmap="viridis",
+    shading="auto",
+    vmin=0.1,
+    vmax=0.8,
 )
-ax.set_xlabel('Local Time (hours)')
-ax.set_ylabel('IWP (g/m2)')
-ax.set_yscale('log')
+ax.set_xlabel("Local Time (hours)")
+ax.set_ylabel("IWP (g/m2)")
+ax.set_yscale("log")
 ax.invert_yaxis()
 plt.colorbar(im, ax=ax)
 # %%

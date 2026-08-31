@@ -11,7 +11,8 @@ from src.helper_functions import nan_detrend, load_histograms, load_slopes
 # %% initialize containers
 bins = np.logspace(-3, 2, 254)[::4]
 colors, line_labels, linestyles = definitions()
-hists = load_histograms()
+hists = load_histograms(set="all")
+hists_models = load_histograms(set="model")
 slopes, _, _ = load_slopes()
 
 # add era5
@@ -111,7 +112,7 @@ for key in hists.keys():
 # %% plot all distributions and cre for 2016
 fig, ax = plt.subplots(figsize=(8, 6))
 
-for key in hists.keys():
+for key in ['ccic', 'era5']:
     ax.plot(
         hists[key]["iwp"],
         hists[key].mean('time'),
@@ -119,6 +120,14 @@ for key in hists.keys():
         color=colors[key],
         linestyle=linestyles[key],
     )
+
+ax.plot(
+    hists_models['icon_amip_control']["iwp"],
+    hists_models['icon_amip_control'],
+    label=line_labels['icon_amip_control'],
+    color=colors['icon_amip_control'],
+    linestyle=linestyles['icon_amip_control'],
+)
 
 ax.set_xscale("log")
 ax.set_xlim([1e-3, 2e1])
@@ -131,7 +140,7 @@ ax.legend(frameon=False)
 ax.set_ylabel(r"$P(I)$")
 ax.set_yticks([0, 0.006, 0.012])
 ax.set_xlabel(r"$I$ / kg m$^{-2}$")
-fig.savefig('plots/anvil_thinning/era5/era5_dist.png', dpi=300, bbox_inches='tight')
+fig.savefig('plots/anvil_thinning/publication/era5_dist.pdf', dpi=300, bbox_inches='tight')
 
 # %% plot slopes and p-value
 fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True, height_ratios=[3, 1])
@@ -298,4 +307,29 @@ ax.stairs(cf_hist, cf_bins, label='ERA5 Cloud Fraction', color='blue')
 ax.set_xlabel('Cloud Fraction')
 ax.set_ylabel('Probability Density')
 ax.set_title('Histogram of Cloud Fraction (ERA5, 2016)')
+# %% plot relative changes CCIC
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(
+    slopes_monthly['ccic'].iwp,
+    slopes_monthly['ccic'] * 100 / hists['ccic'].mean('time'),
+    label='ENSO',
+    color='blue',
+)
+ax.plot(
+    slopes_trend['ccic'].iwp,
+    slopes_trend['ccic'] * 100 / hists['ccic'].mean('time'),
+    label='Linear',
+    color='orange',
+)
+ax.set_xscale("log")
+ax.set_xlim([1e-3, 10])
+ax.grid()
+ax.set_ylim([-15, 5])
+ax.set_yticks([-15, -10, -5, 0, 5])
+ax.set_ylabel("d$P(I)$/d$T$ / % K$^{-1}$")
+ax.set_xlabel(r"$I$ / kg m$^{-2}$")
+ax.spines[["top", "right"]].set_visible(False)
+ax.legend(frameon=False)
+fig.savefig('plots/anvil_thinning/misc/relative_change_ccic.png', bbox_inches='tight', dpi=300)
+
 # %%

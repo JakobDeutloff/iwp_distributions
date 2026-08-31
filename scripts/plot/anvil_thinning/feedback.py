@@ -74,7 +74,7 @@ axes[0].set_ylim(-0.022, 0.03)
 
 axes[1].set_xticks([0, 1, 2])
 axes[1].set_xlim(-0.5, 2.5)
-axes[1].set_xticklabels(["Total", "Area", "Opacity"], rotation=45)
+axes[1].set_xticklabels(["Total", "Amount", "Optical \n Depth"], rotation=45)
 axes[1].set_ylabel(r"$\lambda$ / W m$^{-2}$ K$^{-1}$")
 axes[1].set_yticks([-0.02, 0, 0.05, 0.1])
 axes[1].set_ylim(-0.04, 0.1)
@@ -230,4 +230,3 @@ fig.legend(handles, labels, frameon=False, ncol=1, bbox_to_anchor=(0.99, 0.7))
 # %% print feedback values for table
 for key in ['ccic', 'spare_ice', 'two_c_ice', 'dardar', 'icon_ap_plus2K', 'icon_ap_plus4K', 'rcemip']:
     print(f"{key}: {feedbacks[key].sum().item()/2:.3f} W m^-2 K^-1")
-# %%

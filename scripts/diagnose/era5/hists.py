@@ -12,23 +12,41 @@ import pandas as pd
 
 # %%
 year = sys.argv[1]
-region = sys.argv[2] 
+region = sys.argv[2]
 
 # %%
-ds_full = xr.open_dataset(f"/work/bu1562/m301049/era5/hourly/iwp_{year}.nc").pipe(shift_longitudes)
-ds_cf = xr.open_dataset(f"/work/bu1562/m301049/era5/hourly/cf_{year}.nc").pipe(shift_longitudes)
-ds_full['iwp'] = (ds_full['tciw'] + ds_full['tcsw']) / ds_cf['hcc']
+ds_full = xr.open_dataset(f"/work/bu1562/m301049/era5/hourly/iwp_{year}.nc").pipe(
+    shift_longitudes
+)
+ds_cf = xr.open_dataset(f"/work/bu1562/m301049/era5/hourly/cf_{year}.nc").pipe(
+    shift_longitudes
+)
+ds_full["iwp"] = (ds_full["tciw"] + ds_full["tcsw"]) / ds_cf["hcc"]
 
 # %% calculate weights
 weights_vals = np.cos(np.deg2rad(ds_full.latitude))
 # make weights a DataArray with lat and lon and time dims from ds
-weights_vals = np.repeat(weights_vals.values[:, np.newaxis], ds_full.longitude.size, axis=1)
-weights_vals = np.repeat(weights_vals[np.newaxis, :, :], ds_full.valid_time.size, axis=0)
-weights = xr.DataArray(weights_vals, dims=["valid_time", "latitude", "longitude"], coords={"valid_time": ds_full.valid_time, "latitude": ds_full.latitude, "longitude": ds_full.longitude})
+weights_vals = np.repeat(
+    weights_vals.values[:, np.newaxis], ds_full.longitude.size, axis=1
+)
+weights_vals = np.repeat(
+    weights_vals[np.newaxis, :, :], ds_full.valid_time.size, axis=0
+)
+weights = xr.DataArray(
+    weights_vals,
+    dims=["valid_time", "latitude", "longitude"],
+    coords={
+        "valid_time": ds_full.valid_time,
+        "latitude": ds_full.latitude,
+        "longitude": ds_full.longitude,
+    },
+)
 
 # %% configure mask
 if region == "sea":
-    mask = xr.open_dataarray("/work/bm1183/m301049/orcestra/sea_land_mask.nc").pipe(shift_longitudes, lon_name="lon")
+    mask = xr.open_dataarray("/work/bu1562/m301049/orcestra/sea_land_mask.nc").pipe(
+        shift_longitudes, lon_name="lon"
+    )
     mask = mask.sel(lat=slice(-30, 30)).load()
     mask = mask.sel(
         lon=ds_full["longitude"], lat=ds_full["latitude"], method="nearest"
@@ -41,16 +59,19 @@ else:
 bins_lt = np.arange(0, 25, 1)
 bins_iwp = np.logspace(-3, 2, 254)
 
-days = np.unique(ds_full.valid_time.dt.floor('D').values).astype(str)
-days = [day.split('T')[0] for day in days]
+days = np.unique(ds_full.valid_time.dt.floor("D").values).astype(str)
+days = [day.split("T")[0] for day in days]
+
 
 def calc_2d_hist(day):
 
-    ds_sel = ds_full[['iwp']].sel(valid_time=day)
+    ds_sel = ds_full[["iwp"]].sel(valid_time=day)
     weights_sel = weights.sel(valid_time=day)
 
     local_time = (
-        ds_sel["valid_time"].dt.hour + (ds_sel["valid_time"].dt.minute / 60) + (ds_sel["longitude"] / 15)
+        ds_sel["valid_time"].dt.hour
+        + (ds_sel["valid_time"].dt.minute / 60)
+        + (ds_sel["longitude"] / 15)
     ) % 24
     local_time = local_time.expand_dims({"latitude": ds_sel["latitude"]}).transpose(
         "valid_time", "latitude", "longitude"
@@ -66,13 +87,17 @@ def calc_2d_hist(day):
     )
 
     hist, _, _ = np.histogram2d(
-    ds_sel["local_time"].where(mask).values.flatten(),
-    ds_sel['iwp'].where(mask).values.flatten(),
-    bins=[bins_lt, bins_iwp],
-    density=False,
-    weights=weights_sel.where(mask).values.flatten()
+        ds_sel["local_time"].where(mask).values.flatten(),
+        ds_sel["iwp"].where(mask).values.flatten(),
+        bins=[bins_lt, bins_iwp],
+        density=False,
+        weights=weights_sel.where(mask).values.flatten(),
     )
-    size = weights_sel.where(np.isfinite(ds_full["tciw"].sel(valid_time=day).where(mask))).sum().item()
+    size = (
+        weights_sel.where(np.isfinite(ds_full["tciw"].sel(valid_time=day).where(mask)))
+        .sum()
+        .item()
+    )
     return hist, size
 
 
@@ -93,13 +118,9 @@ hists_xr = xr.Dataset(
         "iwp": 0.5 * (bins_iwp[1:] + bins_iwp[:-1]),
         "time": pd.to_datetime(days),
     },
-    attrs={
-        "description": "2D histogram of ERA5 IWP vs local time"
-    },
+    attrs={"description": "2D histogram of ERA5 IWP vs local time"},
 ).sortby("time")
 
 # %% save dataset
 path = f"/work/bu1562/m301049/era5/diagnosed/iwp_hist_{region}_{year}_weighted_cf.nc"
 hists_xr.to_netcdf(path)
-
-

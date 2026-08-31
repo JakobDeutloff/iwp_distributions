@@ -6,14 +6,12 @@ import pickle
 from src.plot import definitions
 from src.helper_functions import interpolate_bins
 
-
-
 # %% initialize containers
 bins = bins = np.logspace(-3, 2, 254)[::4]
 colors, line_labels, linestyles = definitions()
 
 # %% open distributions CCIC
-path = "/work/bm1183/m301049/ccic/"
+path = "/work/bu1562/m301049/ccic/"
 years = range(2000, 2024)
 months = [f"{i:02d}" for i in range(1, 13)]
 hist_list = []
@@ -32,19 +30,18 @@ hists_ccic = (
 )
 
 # %% open distributions 2C-ICE
-hists_2c = xr.open_dataset("/work/bm1183/m301049/cloudsat/dists.nc")
+hists_2c = xr.open_dataset("/work/bu1562/m301049/cloudsat/dists.nc")
 
 # %% open spareice
-hists_spare = xr.open_dataset("/work/bm1183/m301049/spareice/hists_metop.nc")
+hists_spare = xr.open_dataset("/work/bu1562/m301049/spareice/hists_metop.nc")
 
 # %% open dardar
-dardar = xr.open_dataset("/work/bm1183/m301049/dardarv3.10/hist_dardar.nc")
-
+dardar = xr.open_dataset("/work/bu1562/m301049/dardarv3.10/hist_dardar.nc")
 
 
 # %% load cre data and hists from icon
 cre = xr.open_dataset(
-    f"/work/bm1183/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
+    f"/work/bu1562/m301049/icon_hcap_data/control/production/cre/jed0011_cre_raw.nc"
 )
 
 experiments = {
@@ -55,7 +52,7 @@ experiments = {
 iwp_hists = {}
 for run in ["jed0011", "jed0022", "jed0033"]:
     with open(
-        f"/work/bm1183/m301049/icon_hcap_data/{experiments[run]}/production/{run}_iwp_hist.pkl",
+        f"/work/bu1562/m301049/icon_hcap_data/{experiments[run]}/production/{run}_iwp_hist.pkl",
         "rb",
     ) as f:
         iwp_hists[run] = pickle.load(f)
@@ -74,7 +71,7 @@ for run in ["jed0011", "jed0022", "jed0033"]:
 
 # %% load rcemip data
 ds = xr.open_dataset(
-    "/work/bm1183/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
+    "/work/bu1562/m301049/iwp_framework/blaz_adam/rcemip_iwp-resolved_statistics.nc"
 )
 ds["fwp"] = ds["fwp"] * 1e-3
 # interpolate histogram

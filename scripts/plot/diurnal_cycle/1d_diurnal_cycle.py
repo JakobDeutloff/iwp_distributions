@@ -9,7 +9,6 @@ from src.helper_functions import (
 )
 from scipy.signal import detrend
 
-
 # %% load ccic and gpm data
 color = {"all": "black", "sea": "blue", "land": "green"}
 names = ["all", "sea", "land"]
@@ -19,14 +18,14 @@ hists_gpm = {}
 hists_era5 = {}
 for name in names:
     hists_ccic[name] = xr.open_dataset(
-        f"/work/bm1183/m301049/diurnal_cycle_dists/ccic_2d_monthly_{name}.nc"
+        f"/work/bu1562/m301049/diurnal_cycle_dists/ccic_2d_monthly_{name}.nc"
     )
     hists_gpm[name] = xr.open_dataset(
-        f"/work/bm1183/m301049/diurnal_cycle_dists/gpm_2d_monthly_{name}.nc"
+        f"/work/bu1562/m301049/diurnal_cycle_dists/gpm_2d_monthly_{name}.nc"
     )
-for name in ['all', 'sea']:
+for name in ["all", "sea"]:
     hists_era5[name] = xr.open_dataset(
-        f"/work/bm1183/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_{name}.nc"
+        f"/work/bu1562/m301049/era5/diagnosed/iwp_hist_monthly_interpolated_{name}.nc"
     )
 hists_era5["land"] = hists_era5["all"] - hists_era5["sea"]
 
@@ -37,11 +36,15 @@ fraction_dc_ccic = (
     / hists_ccic["all"]["size"].sel(time="2016").sum()
 )
 
-mean_hist = hists_era5["all"]['hist'].sel(time='2016').sum(['time', 'local_time']) / hists_era5["all"]['size'].sel(time='2016').sum('time')
+mean_hist = hists_era5["all"]["hist"].sel(time="2016").sum(
+    ["time", "local_time"]
+) / hists_era5["all"]["size"].sel(time="2016").sum("time")
 # cumulative sum of hist starting from highest iwp
 area_era5 = mean_hist.sortby("iwp", ascending=False).cumsum("iwp")
 # find iwp where cumulative sum is equal to fraction of deep convective clouds in ccic
-iwp_threshold = area_era5.where(area_era5 >= fraction_dc_ccic).dropna("iwp")["iwp"].max().item()
+iwp_threshold = (
+    area_era5.where(area_era5 >= fraction_dc_ccic).dropna("iwp")["iwp"].max().item()
+)
 print(f"IWP threshold for deep convective clouds in ERA5: {iwp_threshold:.2f} kg m^-2")
 
 # %% calculate cloud fraction
@@ -49,15 +52,18 @@ cf_ccic = {}
 cf_gpm = {}
 cf_era5 = {}
 for name in names:
-    cf_ccic[name] = hists_ccic[name]["hist"].sel(iwp=slice(1, None)).sum(
-        "iwp"
-    ) / hists_ccic[name]["size"]
-    cf_gpm[name] = hists_gpm[name]["hist"].sel(bt=slice(None, 231)).sum(
-        "bt"
-    ) / hists_gpm[name]["size"]
-    cf_era5[name] = hists_era5[name]["hist"].sel(iwp=slice(0.37, None)).sum(
-        "iwp"
-    ) / hists_era5[name]["size"]
+    cf_ccic[name] = (
+        hists_ccic[name]["hist"].sel(iwp=slice(1, None)).sum("iwp")
+        / hists_ccic[name]["size"]
+    )
+    cf_gpm[name] = (
+        hists_gpm[name]["hist"].sel(bt=slice(None, 231)).sum("bt")
+        / hists_gpm[name]["size"]
+    )
+    cf_era5[name] = (
+        hists_era5[name]["hist"].sel(iwp=slice(0.37, None)).sum("iwp")
+        / hists_era5[name]["size"]
+    )
 
 # %% normalise  cloud fractions
 cf_ccic_norm = {}
@@ -71,12 +77,12 @@ for name in names:
 
 # %% load era5 surface temp
 temps = {}
-temps["all"] = xr.open_dataset("/work/bm1183/m301049/era5/monthly/t2m_tropics.nc").t2m
+temps["all"] = xr.open_dataset("/work/bu1562/m301049/era5/monthly/t2m_tropics.nc").t2m
 temps["sea"] = xr.open_dataset(
-    "/work/bm1183/m301049/era5/monthly/t2m_tropics_sea.nc"
+    "/work/bu1562/m301049/era5/monthly/t2m_tropics_sea.nc"
 ).t2m
 temps["land"] = xr.open_dataset(
-    "/work/bm1183/m301049/era5/monthly/t2m_tropics_land.nc"
+    "/work/bu1562/m301049/era5/monthly/t2m_tropics_land.nc"
 ).t2m
 
 # %% detrend and deseasonalize
@@ -127,9 +133,12 @@ hists_raw = {}
 slopes_icon = {}
 for run in runs:
     hists_raw[run] = xr.open_dataset(
-        f"/work/bm1183/m301049/icon_hcap_data/publication/distributions/{run}_daily_cycle_hist_2d.nc"
+        f"/work/bu1562/m301049/icon_hcap_data/publication/distributions/{run}_daily_cycle_hist_2d.nc"
     )
-    hists_icon[run] = hists_raw[run]["hist"].sel(iwp=slice(1, None)).sum("iwp") / hists_raw[run]["size"]
+    hists_icon[run] = (
+        hists_raw[run]["hist"].sel(iwp=slice(1, None)).sum("iwp")
+        / hists_raw[run]["size"]
+    )
 
 
 for run in runs[1:]:
@@ -218,9 +227,11 @@ def plot_change_diurnal_cycle(slopes, err):
 fig_ccic_change = plot_change_diurnal_cycle(slopes_ccic, err_ccic)
 fig_gpm_change = plot_change_diurnal_cycle(slopes_gpm, err_gpm)
 fig_era5_change = plot_change_diurnal_cycle(slopes_era5, err_era5)
-fig_era5_change.savefig("plots/diurnal_cycle/long_term/era5_1d_change_internal.pdf", bbox_inches="tight")
-#fig_ccic_change.savefig("plots/diurnal_cycle/talk/ccic_1d_change.pdf", bbox_inches="tight")
-#fig_gpm_change.savefig("plots/diurnal_cycle/talk/gpm_1d_change.pdf", bbox_inches="tight")
+fig_era5_change.savefig(
+    "plots/diurnal_cycle/long_term/era5_1d_change_internal.pdf", bbox_inches="tight"
+)
+# fig_ccic_change.savefig("plots/diurnal_cycle/talk/ccic_1d_change.pdf", bbox_inches="tight")
+# fig_gpm_change.savefig("plots/diurnal_cycle/talk/gpm_1d_change.pdf", bbox_inches="tight")
 
 # %% calculate mean change in f
 for name in names:
@@ -332,7 +343,7 @@ for name in names:
     cf_detrend = nan_detrend(cf_gpm[name], dim="local_time")
     cf_gpm_deseason_raw[name] = deseason(cf_detrend)
 
-#regression
+# regression
 slopes_ccic_raw = {}
 slopes_gpm_raw = {}
 err_ccic_raw = {}
@@ -351,7 +362,7 @@ ax.plot(
     slopes_ccic_raw["all"].local_time,
     slopes_ccic_raw["all"],
     color="black",
-    label = f"$I$ All",
+    label=f"$I$ All",
 )
 ax.fill_between(
     slopes_ccic_raw["all"].local_time,
@@ -383,12 +394,15 @@ ax.set_ylabel(
 ax.spines[["top", "right"]].set_visible(False)
 ax.set_xticks([6, 12, 18])
 ax.legend(frameon=False)
-fig.savefig("plots/diurnal_cycle/publication/diurnal_cycle_change_all_nonnormalised.pdf", bbox_inches="tight")
+fig.savefig(
+    "plots/diurnal_cycle/publication/diurnal_cycle_change_all_nonnormalised.pdf",
+    bbox_inches="tight",
+)
 
 # %% plot for thesis
 hist_icon_control = (
     xr.open_dataset(
-        "/work/bm1183/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
+        "/work/bu1562/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
     )
     .coarsen(iwp=4, boundary="trim")
     .sum()
@@ -399,12 +413,12 @@ cf_icon = (
 )
 
 color = {
-    'land': "#9B6A01",
-    'sea': "#3d9ef8",
+    "land": "#9B6A01",
+    "sea": "#3d9ef8",
 }
 fig, axes = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
 axes[1].axhline(0, color="black", linewidth=0.7)
-# plot diurnal cycle CCIC and ICON 
+# plot diurnal cycle CCIC and ICON
 for name in ["land", "sea"]:
     axes[0].plot(
         cf_ccic[name].local_time,
@@ -444,7 +458,7 @@ axes[1].plot(
 )
 axes[1].plot(
     slopes_ccic[name].local_time,
-    slopes_icon['jed0033'],
+    slopes_icon["jed0033"],
     color="#1f948a",
     label="ICON +2K",
     linestyle="--",
@@ -456,10 +470,10 @@ axes[1].set_ylabel(
 axes[0].set_yticks([0.6, 1, 1.4])
 axes[1].set_yticks([-4, 0, 4])
 axes[1].set_xlabel("Local Time / h")
-labels = ['CCIC Land', 'CCIC Ocean', 'ICON Control', 'ICON +2K', 'ICON +4K']
+labels = ["CCIC Land", "CCIC Ocean", "ICON Control", "ICON +2K", "ICON +4K"]
 handles = [
-    plt.Line2D([0], [0], color=color['land'], linestyle="-"),
-    plt.Line2D([0], [0], color=color['sea'], linestyle="-"),
+    plt.Line2D([0], [0], color=color["land"], linestyle="-"),
+    plt.Line2D([0], [0], color=color["sea"], linestyle="-"),
     plt.Line2D([0], [0], color="#462d7b", linestyle="--"),
     plt.Line2D([0], [0], color="#1f948a", linestyle="--"),
     plt.Line2D([0], [0], color="#c1df24", linestyle="--"),
@@ -486,7 +500,7 @@ fig.savefig("plots/thesis/diurnal_cycle.pdf", bbox_inches="tight", dpi=400)
 # %% plots for talk --------------------------------------------
 hist_icon_control = (
     xr.open_dataset(
-        "/work/bm1183/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
+        "/work/bu1562/m301049/icon_hcap_data/control/production/daily_cycle_hist_2d.nc"
     )
     .coarsen(iwp=4, boundary="trim")
     .sum()
@@ -652,10 +666,7 @@ ax.plot(
     slopes_ccic["sea"],
     color="blue",
 )
-ax.plot(
-    cf_90.local_time,
-    slopes_icon["jed0022"],
-    color="red")
+ax.plot(cf_90.local_time, slopes_icon["jed0022"], color="red")
 ax.set_xlim([0, 24])
 ax.set_xlabel("Local Time / h")
 ax.set_ylabel("$f_{\mathrm{d}}$")
@@ -663,13 +674,25 @@ ax.legend(frameon=False)
 ax.spines[["top", "right"]].set_visible(False)
 fig.savefig("plots/diurnal_cycle/talk/percentiles.png", dpi=300)
 # %% calculate mean shift
-change_ccic = slopes_ccic['sea']/100 * cf_ccic['sea'].mean('time')
-change_icon = slopes_icon['jed0022']/100 * hists_icon['jed0022']
-change_icon = xr.DataArray(list(change_icon), coords={'local_time':cf_ccic['sea'].local_time.values}, dims='local_time')
-daytime_reduction_ccic = change_ccic.sel(local_time=slice(6,18)).sum() * 100 / cf_ccic['sea'].sel(local_time=slice(6,18)).mean('time').sum()
-daytime_reduction_icon = change_icon.sel(local_time=slice(6,18)).sum() * 100 / cf_ccic['sea'].sel(local_time=slice(6,18)).mean('time').sum()
+change_ccic = slopes_ccic["sea"] / 100 * cf_ccic["sea"].mean("time")
+change_icon = slopes_icon["jed0022"] / 100 * hists_icon["jed0022"]
+change_icon = xr.DataArray(
+    list(change_icon),
+    coords={"local_time": cf_ccic["sea"].local_time.values},
+    dims="local_time",
+)
+daytime_reduction_ccic = (
+    change_ccic.sel(local_time=slice(6, 18)).sum()
+    * 100
+    / cf_ccic["sea"].sel(local_time=slice(6, 18)).mean("time").sum()
+)
+daytime_reduction_icon = (
+    change_icon.sel(local_time=slice(6, 18)).sum()
+    * 100
+    / cf_ccic["sea"].sel(local_time=slice(6, 18)).mean("time").sum()
+)
 print(f"reduction daytime ccic: {daytime_reduction_ccic.values}")
 print(f"reduction daytime icon: {daytime_reduction_icon.values}")
 
 
-# %% 
+# %%

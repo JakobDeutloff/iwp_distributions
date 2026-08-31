@@ -37,14 +37,18 @@ feedback_area = xr.Dataset()
 feedback_opacity = xr.Dataset()
 for key in hists.keys():
     g_cap = slopes[key].sum() / hists[key].sum()
-    print(f"g_cap for {key}: {g_cap*100} %/K")
     g_prime = (slopes[key] / hists[key]) - g_cap
     feedback_area = feedback_area.assign({key: (cre["net"] * hists[key]).sum() * g_cap})
     feedback_opacity = feedback_opacity.assign({key: (g_prime * hists[key] * cre["net"]).sum()})
+
+# %% print mean CRE
+for key in hists.keys():
+    print(f'{key}: Mean CRE: {(cre["net"] * hists[key]).sum().item():.2f} W m^-2')
+
 
 # %% save feedbacks
 feedback.to_netcdf("/work/bu1562/m301049/iwp_dists/feedback.nc")
 feedback_area.to_netcdf("/work/bu1562/m301049/iwp_dists/feedback_area.nc")
 feedback_opacity.to_netcdf("/work/bu1562/m301049/iwp_dists/feedback_opacity.nc")
 
-# %%
+
